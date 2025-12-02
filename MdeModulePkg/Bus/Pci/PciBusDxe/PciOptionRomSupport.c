@@ -371,7 +371,7 @@ ContainEfiImage (
   @param RomBase   Base address of Option Rom.
 
   @retval EFI_OUT_OF_RESOURCES No enough memory to hold image.
-  @retval EFI_SUCESS           Successfully loaded Option Rom.
+  @retval EFI_SUCCESS          Successfully loaded Option Rom.
 
 **/
 EFI_STATUS
@@ -506,13 +506,13 @@ LoadOpRomImage (
     Indicator    = RomPcir->Indicator;
     RomImageSize = RomImageSize + RomPcir->ImageLength * 512;
     RomBarOffset = RomBarOffset + RomPcir->ImageLength * 512;
-  } while (((Indicator & 0x80) == 0x00) && ((RomBarOffset - RomBar) < RomSize));
+  } while (((Indicator & 0x80) == 0x00) && ((RomBarOffset - RomBar) < RomSize) && (RomImageSize > 0));
 
   //
   // Some Legacy Cards do not report the correct ImageLength so used the maximum
   // of the legacy length and the PCIR Image Length
   //
-  if (CodeType == PCI_CODE_TYPE_PCAT_IMAGE) {
+  if ((RomImageSize > 0) && (CodeType == PCI_CODE_TYPE_PCAT_IMAGE)) {
     RomImageSize = MAX (RomImageSize, LegacyImageLength);
   }
 

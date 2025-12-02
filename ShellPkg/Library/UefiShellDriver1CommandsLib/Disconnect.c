@@ -98,7 +98,10 @@ ShellCommandRunDisconnect (
   UINT64        Intermediate2;
   UINT64        Intermediate3;
 
-  ShellStatus = SHELL_SUCCESS;
+  Intermediate1 = 0;
+  Intermediate2 = 0;
+  Intermediate3 = 0;
+  ShellStatus   = SHELL_SUCCESS;
 
   //
   // initialize the shell lib (we must be in non-auto-init...)
@@ -115,7 +118,7 @@ ShellCommandRunDisconnect (
   Status = ShellCommandLineParse (ParamList, &Package, &ProblemParam, TRUE);
   if (EFI_ERROR (Status)) {
     if ((Status == EFI_VOLUME_CORRUPTED) && (ProblemParam != NULL)) {
-      ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_PROBLEM), gShellDriver1HiiHandle, L"disconnect", ProblemParam);
+      ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_PROBLEM), gShellDriver1HiiHandle, L"disconnect", ProblemParam);
       FreePool (ProblemParam);
       ShellStatus = SHELL_INVALID_PARAMETER;
     } else {
@@ -124,10 +127,10 @@ ShellCommandRunDisconnect (
   } else {
     if (ShellCommandLineGetFlag (Package, L"-r")) {
       if (ShellCommandLineGetCount (Package) > 1) {
-        ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_TOO_MANY), gShellDriver1HiiHandle, L"disconnect");
+        ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_TOO_MANY), gShellDriver1HiiHandle, L"disconnect");
         ShellStatus = SHELL_INVALID_PARAMETER;
       } else if (ShellCommandLineGetCount (Package) < 1) {
-        ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_TOO_FEW), gShellDriver1HiiHandle, L"disconnect");
+        ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_TOO_FEW), gShellDriver1HiiHandle, L"disconnect");
         ShellStatus = SHELL_INVALID_PARAMETER;
       } else {
         Status = DisconnectAll ();
@@ -144,14 +147,14 @@ ShellCommandRunDisconnect (
         }
       }
     } else if (ShellCommandLineGetFlag (Package, L"-nc")) {
-      ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_TOO_FEW), gShellDriver1HiiHandle, L"disconnect");
+      ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_TOO_FEW), gShellDriver1HiiHandle, L"disconnect");
       ShellStatus = SHELL_INVALID_PARAMETER;
     } else {
       if (ShellCommandLineGetCount (Package) > 4) {
-        ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_TOO_MANY), gShellDriver1HiiHandle, L"disconnect");
+        ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_TOO_MANY), gShellDriver1HiiHandle, L"disconnect");
         ShellStatus = SHELL_INVALID_PARAMETER;
       } else if (ShellCommandLineGetCount (Package) < 2) {
-        ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_TOO_FEW), gShellDriver1HiiHandle, L"disconnect");
+        ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_TOO_FEW), gShellDriver1HiiHandle, L"disconnect");
         ShellStatus = SHELL_INVALID_PARAMETER;
       } else {
         //
@@ -160,30 +163,42 @@ ShellCommandRunDisconnect (
         Param1 = ShellCommandLineGetRawValue (Package, 1);
         Param2 = ShellCommandLineGetRawValue (Package, 2);
         Param3 = ShellCommandLineGetRawValue (Package, 3);
-        ShellConvertStringToUint64 (Param1, &Intermediate1, TRUE, FALSE);
-        Handle1 = Param1 != NULL ? ConvertHandleIndexToHandle ((UINTN)Intermediate1) : NULL;
-        ShellConvertStringToUint64 (Param2, &Intermediate2, TRUE, FALSE);
-        Handle2 = Param2 != NULL ? ConvertHandleIndexToHandle ((UINTN)Intermediate2) : NULL;
-        ShellConvertStringToUint64 (Param3, &Intermediate3, TRUE, FALSE);
-        Handle3 = Param3 != NULL ? ConvertHandleIndexToHandle ((UINTN)Intermediate3) : NULL;
+
+        if (Param1 && !EFI_ERROR (ShellConvertStringToUint64 (Param1, &Intermediate1, TRUE, FALSE))) {
+          Handle1 = ConvertHandleIndexToHandle ((UINTN)Intermediate1);
+        } else {
+          Handle1 = NULL;
+        }
+
+        if (Param2 && !EFI_ERROR (ShellConvertStringToUint64 (Param2, &Intermediate2, TRUE, FALSE))) {
+          Handle2 = ConvertHandleIndexToHandle ((UINTN)Intermediate2);
+        } else {
+          Handle2 = NULL;
+        }
+
+        if (Param3 && !EFI_ERROR (ShellConvertStringToUint64 (Param3, &Intermediate3, TRUE, FALSE))) {
+          Handle3 = ConvertHandleIndexToHandle ((UINTN)Intermediate3);
+        } else {
+          Handle3 = NULL;
+        }
 
         if ((Param1 != NULL) && (Handle1 == NULL)) {
-          ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_INV_HANDLE), gShellDriver1HiiHandle, L"disconnect", Param1);
+          ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_INV_HANDLE), gShellDriver1HiiHandle, L"disconnect", Param1);
           ShellStatus = SHELL_INVALID_PARAMETER;
         } else if ((Param2 != NULL) && (Handle2 == NULL)) {
-          ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_INV_HANDLE), gShellDriver1HiiHandle, L"disconnect", Param2);
+          ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_INV_HANDLE), gShellDriver1HiiHandle, L"disconnect", Param2);
           ShellStatus = SHELL_INVALID_PARAMETER;
         } else if ((Param3 != NULL) && (Handle3 == NULL)) {
-          ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_INV_HANDLE), gShellDriver1HiiHandle, L"disconnect", Param3);
+          ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_INV_HANDLE), gShellDriver1HiiHandle, L"disconnect", Param3);
           ShellStatus = SHELL_INVALID_PARAMETER;
         } else if ((Handle2 != NULL) && EFI_ERROR (gBS->OpenProtocol (Handle2, &gEfiDriverBindingProtocolGuid, NULL, gImageHandle, NULL, EFI_OPEN_PROTOCOL_TEST_PROTOCOL))) {
           ASSERT (Param2 != NULL);
-          ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_HANDLE_NOT), gShellDriver1HiiHandle, L"disconnect", ShellStrToUintn (Param2), L"driver handle");
+          ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_HANDLE_NOT), gShellDriver1HiiHandle, L"disconnect", ShellStrToUintn (Param2), L"driver handle");
           ShellStatus = SHELL_INVALID_PARAMETER;
         } else {
           ASSERT (Param1 != NULL);
           Status = gBS->DisconnectController (Handle1, Handle2, Handle3);
-          ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_3P_RESULT), gShellDriver1HiiHandle, L"Disconnect", (UINTN)Intermediate1, (UINTN)Intermediate2, (UINTN)Intermediate3, Status);
+          ShellPrintHiiDefaultEx (STRING_TOKEN (STR_3P_RESULT), gShellDriver1HiiHandle, L"Disconnect", (UINTN)Intermediate1, (UINTN)Intermediate2, (UINTN)Intermediate3, Status);
         }
       }
     }

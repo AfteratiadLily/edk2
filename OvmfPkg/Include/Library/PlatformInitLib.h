@@ -10,44 +10,67 @@
 #define PLATFORM_INIT_LIB_H_
 
 #include <PiPei.h>
+#include <IndustryStandard/E820.h>
 
 #pragma pack(1)
+
+/*
+The work area is used to support reading from cache in QemuFwCfgLib.
+It is also used as global variable in Dxe phase.
+*/
 typedef struct {
-  EFI_HOB_GUID_TYPE    GuidHeader;
-  UINT16               HostBridgeDevId;
+  BOOLEAN    QemuFwCfgSupported;
+  BOOLEAN    QemuFwCfgDmaSupported;
+  UINT16     FwCfgItem;
+  UINT32     Offset;
+  BOOLEAN    Reading;
+} QEMU_FW_CFG_WORK_AREA;
 
-  UINT64               PcdConfidentialComputingGuestAttr;
-  BOOLEAN              SevEsIsEnabled;
+typedef struct {
+  EFI_HOB_GUID_TYPE        GuidHeader;
+  UINT16                   HostBridgeDevId;
 
-  UINT32               BootMode;
-  BOOLEAN              S3Supported;
+  UINT64                   PcdConfidentialComputingGuestAttr;
+  BOOLEAN                  SevEsIsEnabled;
 
-  BOOLEAN              SmmSmramRequire;
-  BOOLEAN              Q35SmramAtDefaultSmbase;
-  UINT16               Q35TsegMbytes;
+  UINT32                   BootMode;
+  BOOLEAN                  S3Supported;
 
-  UINT64               FirstNonAddress;
-  UINT8                PhysMemAddressWidth;
-  UINT32               Uc32Base;
-  UINT32               Uc32Size;
+  BOOLEAN                  SmmSmramRequire;
+  BOOLEAN                  Q35SmramAtDefaultSmbase;
+  UINT16                   Q35TsegMbytes;
 
-  BOOLEAN              PcdSetNxForStack;
-  UINT64               PcdTdxSharedBitMask;
+  UINT32                   LowMemory;
+  UINT64                   FirstNonAddress;
+  UINT8                    PhysMemAddressWidth;
+  UINT32                   Uc32Base;
+  UINT32                   Uc32Size;
 
-  UINT64               PcdPciMmio64Base;
-  UINT64               PcdPciMmio64Size;
-  UINT32               PcdPciMmio32Base;
-  UINT32               PcdPciMmio32Size;
-  UINT64               PcdPciIoBase;
-  UINT64               PcdPciIoSize;
+  BOOLEAN                  PcdSetNxForStack;
+  UINT64                   PcdTdxSharedBitMask;
 
-  UINT64               PcdEmuVariableNvStoreReserved;
-  UINT32               PcdCpuBootLogicalProcessorNumber;
-  UINT32               PcdCpuMaxLogicalProcessorNumber;
-  UINT32               DefaultMaxCpuNumber;
+  UINT64                   PcdPciMmio64Base;
+  UINT64                   PcdPciMmio64Size;
+  BOOLEAN                  PcdPciMmio64Override;
+  UINT32                   PcdPciMmio32Base;
+  UINT32                   PcdPciMmio32Size;
+  UINT64                   PcdPciIoBase;
+  UINT64                   PcdPciIoSize;
 
-  UINT32               S3AcpiReservedMemoryBase;
-  UINT32               S3AcpiReservedMemorySize;
+  UINT64                   PcdEmuVariableNvStoreReserved;
+  UINT32                   PcdCpuBootLogicalProcessorNumber;
+  UINT32                   PcdCpuMaxLogicalProcessorNumber;
+  UINT32                   DefaultMaxCpuNumber;
+
+  UINT32                   S3AcpiReservedMemoryBase;
+  UINT32                   S3AcpiReservedMemorySize;
+
+  BOOLEAN                  FeatureControl;
+  UINT64                   FeatureControlValue;
+
+  BOOLEAN                  QemuFwCfgChecked;
+
+  QEMU_FW_CFG_WORK_AREA    QemuFwCfgWorkArea;
 } EFI_HOB_PLATFORM_INFO;
 #pragma pack()
 
@@ -138,7 +161,7 @@ PlatformQemuUc32BaseInitialization (
   IN OUT EFI_HOB_PLATFORM_INFO  *PlatformInfoHob
   );
 
-UINT32
+VOID
 EFIAPI
 PlatformGetSystemMemorySizeBelow4gb (
   IN EFI_HOB_PLATFORM_INFO  *PlatformInfoHob
@@ -204,23 +227,6 @@ PlatformMaxCpuCountInitialization (
   );
 
 /**
-  In Tdx guest, some information need to be passed from host VMM to guest
-  firmware. For example, the memory resource, etc. These information are
-  prepared by host VMM and put in HobList which is described in TdxMetadata.
-
-  Information in HobList is treated as external input. From the security
-  perspective before it is consumed, it should be validated.
-
-  @retval   EFI_SUCCESS   Successfully process the hoblist
-  @retval   Others        Other error as indicated
-**/
-EFI_STATUS
-EFIAPI
-ProcessTdxHobList (
-  VOID
-  );
-
-/**
   In Tdx guest, the system memory is passed in TdHob by host VMM. So
   the major task of PlatformTdxPublishRamRegions is to walk thru the
   TdHob list and transfer the ResourceDescriptorHob and MemoryAllocationHob
@@ -283,6 +289,36 @@ EFI_STATUS
 EFIAPI
 PlatformInitEmuVariableNvStore (
   IN VOID  *EmuVariableNvStore
+  );
+
+typedef VOID (*E820_SCAN_CALLBACK) (
+  EFI_E820_ENTRY64       *E820Entry,
+  EFI_HOB_PLATFORM_INFO  *PlatformInfoHob
+  );
+
+BOOLEAN
+EFIAPI
+PlatformIgvmMemoryMapCheck (
+  VOID
+  );
+
+EFI_STATUS
+EFIAPI
+PlatformIgvmScanE820 (
+  IN      E820_SCAN_CALLBACK     Callback,
+  IN OUT  EFI_HOB_PLATFORM_INFO  *PlatformInfoHob
+  );
+
+VOID
+EFIAPI
+PlatformIgvmDataHobs (
+  VOID
+  );
+
+UINT32
+EFIAPI
+PlatformIgvmVpCount (
+  VOID
   );
 
 #endif // PLATFORM_INIT_LIB_H_

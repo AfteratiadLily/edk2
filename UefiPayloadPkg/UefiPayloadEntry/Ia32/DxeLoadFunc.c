@@ -15,11 +15,14 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #include <Library/MemoryAllocationLib.h>
 #include <Library/PcdLib.h>
 #include <Library/HobLib.h>
+#include <Library/FdtLib.h>
 #include "VirtualMemory.h"
 #include "UefiPayloadEntry.h"
 
 #define STACK_SIZE       0x20000
 #define IDT_ENTRY_COUNT  32
+
+extern VOID  *mHobList;
 
 typedef struct _X64_IDT_TABLE {
   //
@@ -174,7 +177,7 @@ Create4GPageTablesIa32Pae (
   // Protect the page table by marking the memory used for page table to be
   // read-only.
   //
-  EnablePageTableProtection ((UINTN)PageMap, FALSE);
+  EnablePageTableProtection ((UINTN)PageMap, 3);
 
   return (UINTN)PageMap;
 }
@@ -268,13 +271,14 @@ HandOffToDxeCore (
   UINT32                   Index;
   X64_IDT_TABLE            *IdtTableForX64;
 
+  // Initialize floating point operating environment to be compliant with UEFI spec.
+  InitializeFloatingPointUnits ();
+
   //
-  // Clear page 0 and mark it as allocated if NULL pointer detection is enabled.
+  // Mask off all legacy 8259 interrupt sources
   //
-  if (IsNullDetectionEnabled ()) {
-    ClearFirst4KPage (HobList.Raw);
-    BuildMemoryAllocationHob (0, EFI_PAGES_TO_SIZE (1), EfiBootServicesData);
-  }
+  IoWrite8 (LEGACY_8259_MASK_REGISTER_MASTER, 0xFF);
+  IoWrite8 (LEGACY_8259_MASK_REGISTER_SLAVE, 0xFF);
 
   BaseOfStack = (EFI_PHYSICAL_ADDRESS)(UINTN)AllocatePages (EFI_SIZE_TO_PAGES (STACK_SIZE));
   ASSERT (BaseOfStack != 0);
@@ -354,8 +358,8 @@ HandOffToDxeCore (
 
     DEBUG ((
       DEBUG_INFO,
-      "%a() Stack Base: 0x%lx, Stack Size: 0x%x\n",
-      __FUNCTION__,
+      "%a() Stack Base: 0x%llx, Stack Size: 0x%x\n",
+      __func__,
       BaseOfStack,
       STACK_SIZE
       ));

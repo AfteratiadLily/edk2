@@ -35,6 +35,10 @@ GetDebugPrintErrorLevel (
   UNIVERSAL_PAYLOAD_GENERIC_HEADER      *GenericHeader;
   UEFI_PAYLOAD_DEBUG_PRINT_ERROR_LEVEL  *DebugPrintErrorLevel;
 
+  if (GetHobList () == NULL) {
+    return PcdGet32 (PcdDebugPrintErrorLevel);
+  }
+
   if (!gDebugPrintErrorLevelInitialized) {
     gDebugPrintErrorLevelInitialized = TRUE;
     gDebugPrintErrorLevel            = PcdGet32 (PcdDebugPrintErrorLevel);
@@ -46,7 +50,7 @@ GetDebugPrintErrorLevel (
       {
         if (GenericHeader->Revision == UEFI_PAYLOAD_DEBUG_PRINT_ERROR_LEVEL_REVISION) {
           DebugPrintErrorLevel =  (UEFI_PAYLOAD_DEBUG_PRINT_ERROR_LEVEL *)GET_GUID_HOB_DATA (GuidHob);
-          if (DebugPrintErrorLevel->Header.Length > UNIVERSAL_PAYLOAD_SIZEOF_THROUGH_FIELD (UEFI_PAYLOAD_DEBUG_PRINT_ERROR_LEVEL, ErrorLevel)) {
+          if (DebugPrintErrorLevel->Header.Length >= UNIVERSAL_PAYLOAD_SIZEOF_THROUGH_FIELD (UEFI_PAYLOAD_DEBUG_PRINT_ERROR_LEVEL, ErrorLevel)) {
             gDebugPrintErrorLevel = DebugPrintErrorLevel->ErrorLevel;
           }
         }

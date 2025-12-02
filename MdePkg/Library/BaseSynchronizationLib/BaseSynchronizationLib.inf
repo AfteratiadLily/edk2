@@ -21,7 +21,7 @@
   LIBRARY_CLASS                  = SynchronizationLib
 
 #
-#  VALID_ARCHITECTURES           = IA32 X64 EBC ARM AARCH64
+#  VALID_ARCHITECTURES           = IA32 X64 EBC AARCH64
 #
 [Sources]
   BaseSynchronizationLibInternals.h
@@ -70,10 +70,6 @@
   Synchronization.c
   Ebc/Synchronization.c
 
-[Sources.ARM]
-  Synchronization.c
-  Arm/Synchronization.S         | GCC
-
 [Sources.AARCH64]
   Synchronization.c
   AArch64/Synchronization.S     | GCC
@@ -81,7 +77,7 @@
 
 [Sources.RISCV64]
   Synchronization.c
-  RiscV64/Synchronization.S
+  RiscV64/Synchronization.S     | GCC
 
 [Sources.LOONGARCH64]
   Synchronization.c

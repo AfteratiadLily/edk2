@@ -96,8 +96,8 @@ DoDiagnostics (
   } else {
     DriverHandleList = GetHandleListByProtocolList (DiagGuidList);
     if (DriverHandleList == NULL) {
-      ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_PROTOCOL_NF), gShellDriver1HiiHandle, L"drvdiag", L"gEfiDriverDiagnosticsProtocolGuid", &gEfiDriverDiagnosticsProtocolGuid);
-      ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_PROTOCOL_NF), gShellDriver1HiiHandle, L"drvdiag", L"gEfiDriverDiagnostics2ProtocolGuid", &gEfiDriverDiagnostics2ProtocolGuid);
+      ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_PROTOCOL_NF), gShellDriver1HiiHandle, L"drvdiag", L"gEfiDriverDiagnosticsProtocolGuid", &gEfiDriverDiagnosticsProtocolGuid);
+      ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_PROTOCOL_NF), gShellDriver1HiiHandle, L"drvdiag", L"gEfiDriverDiagnostics2ProtocolGuid", &gEfiDriverDiagnostics2ProtocolGuid);
       return (EFI_NOT_FOUND);
     }
 
@@ -108,8 +108,8 @@ DoDiagnostics (
   if (ControllerHandle != NULL) {
     ControllerHandleList = AllocateZeroPool (2*sizeof (EFI_HANDLE));
     if (ControllerHandleList == NULL) {
-      SHELL_FREE_NON_NULL (DriverHandleList);
-      return EFI_OUT_OF_RESOURCES;
+      Status2 = EFI_OUT_OF_RESOURCES;
+      goto Done;
     }
 
     ControllerHandleList[0]   = ControllerHandle;
@@ -121,9 +121,8 @@ DoDiagnostics (
   if (ChildHandle != NULL) {
     ChildHandleList = AllocateZeroPool (2*sizeof (EFI_HANDLE));
     if (ChildHandleList == NULL) {
-      SHELL_FREE_NON_NULL (ControllerHandleList);
-      SHELL_FREE_NON_NULL (DriverHandleList);
-      return EFI_OUT_OF_RESOURCES;
+      Status2 = EFI_OUT_OF_RESOURCES;
+      goto Done;
     }
 
     ChildHandleList[0]   = ChildHandle;
@@ -138,7 +137,7 @@ DoDiagnostics (
   }
 
   if (Mode == TestModeList) {
-    ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_DRVDIAG_HEADER), gShellDriver1HiiHandle);
+    ShellPrintHiiDefaultEx (STRING_TOKEN (STR_DRVDIAG_HEADER), gShellDriver1HiiHandle);
   }
 
   for (DriverHandleListLoop = 0
@@ -147,20 +146,20 @@ DoDiagnostics (
        )
   {
     if (Mode == TestModeList) {
-      ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_DRVDIAG_DRIVER_HEADER), gShellDriver1HiiHandle, ConvertHandleToHandleIndex (DriverHandleList[DriverHandleListLoop]));
+      ShellPrintHiiDefaultEx (STRING_TOKEN (STR_DRVDIAG_DRIVER_HEADER), gShellDriver1HiiHandle, ConvertHandleToHandleIndex (DriverHandleList[DriverHandleListLoop]));
     }
 
     if (ControllerHandle == NULL) {
       PARSE_HANDLE_DATABASE_DEVICES (DriverHandleList[DriverHandleListLoop], &ControllerHandleListCount, &ControllerHandleList);
     }
 
-    if (ControllerHandleListCount == 0) {
+    if ((ControllerHandleListCount == 0) || (ControllerHandleList == NULL)) {
       if (Mode == TestModeList) {
-        ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_DRVDIAG_DRIVER_NO_HANDLES), gShellDriver1HiiHandle);
+        ShellPrintHiiDefaultEx (STRING_TOKEN (STR_DRVDIAG_DRIVER_NO_HANDLES), gShellDriver1HiiHandle);
       }
     } else {
       if (Mode == TestModeList) {
-        ShellPrintEx (-1, -1, L"\r\n");
+        ShellPrintDefaultEx (L"\r\n");
       }
 
       for (ControllerHandleListLoop = 0
@@ -199,18 +198,24 @@ DoDiagnostics (
                               );
               if (!EFI_ERROR (Status) && (DriverDiagnostics2 != NULL)) {
                 Language = GetBestLanguageForDriver (DriverDiagnostics2->SupportedLanguages, Lang, FALSE);
-                Found    = TRUE;
-                Status   = DriverDiagnostics2->RunDiagnostics (
-                                                 DriverDiagnostics2,
-                                                 ControllerHandleList[ControllerHandleListLoop],
-                                                 ChildHandleList == NULL ? NULL : ChildHandleList[ChildHandleListLoop],
-                                                 (EFI_DRIVER_DIAGNOSTIC_TYPE)Mode,
-                                                 Language,
-                                                 &ErrorType,
-                                                 &OutBufferSize,
-                                                 &OutBuffer
-                                                 );
+                if (Language == NULL) {
+                  Status2 = EFI_NOT_FOUND;
+                  goto Done;
+                }
+
+                Found  = TRUE;
+                Status = DriverDiagnostics2->RunDiagnostics (
+                                               DriverDiagnostics2,
+                                               ControllerHandleList[ControllerHandleListLoop],
+                                               ChildHandleList == NULL ? NULL : ChildHandleList[ChildHandleListLoop],
+                                               (EFI_DRIVER_DIAGNOSTIC_TYPE)Mode,
+                                               Language,
+                                               &ErrorType,
+                                               &OutBufferSize,
+                                               &OutBuffer
+                                               );
                 FreePool (Language);
+                Language = NULL;
               }
             }
 
@@ -225,17 +230,23 @@ DoDiagnostics (
                               );
               if (!EFI_ERROR (Status)) {
                 Language = GetBestLanguageForDriver (DriverDiagnostics->SupportedLanguages, Lang, FALSE);
-                Status   = DriverDiagnostics->RunDiagnostics (
-                                                DriverDiagnostics,
-                                                ControllerHandleList[ControllerHandleListLoop],
-                                                ChildHandleList == NULL ? NULL : ChildHandleList[ChildHandleListLoop],
-                                                (EFI_DRIVER_DIAGNOSTIC_TYPE)Mode,
-                                                Language,
-                                                &ErrorType,
-                                                &OutBufferSize,
-                                                &OutBuffer
-                                                );
+                if (Language == NULL) {
+                  Status2 = EFI_NOT_FOUND;
+                  goto Done;
+                }
+
+                Status = DriverDiagnostics->RunDiagnostics (
+                                              DriverDiagnostics,
+                                              ControllerHandleList[ControllerHandleListLoop],
+                                              ChildHandleList == NULL ? NULL : ChildHandleList[ChildHandleListLoop],
+                                              (EFI_DRIVER_DIAGNOSTIC_TYPE)Mode,
+                                              Language,
+                                              &ErrorType,
+                                              &OutBufferSize,
+                                              &OutBuffer
+                                              );
                 FreePool (Language);
+                Language = NULL;
               }
             }
 
@@ -245,10 +256,7 @@ DoDiagnostics (
 
             HandleIndex1 = ConvertHandleToHandleIndex (DriverHandleList[DriverHandleListLoop]);
             HandleIndex2 = ConvertHandleToHandleIndex (ControllerHandleList[ControllerHandleListLoop]);
-            ShellPrintHiiEx (
-              -1,
-              -1,
-              NULL,
+            ShellPrintHiiDefaultEx (
               STRING_TOKEN (STR_3P_RESULT),
               gShellDriver1HiiHandle,
               L"DrvDiag",
@@ -272,10 +280,7 @@ DoDiagnostics (
             //
             // Print out the information that this set can be tested
             //
-            ShellPrintHiiEx (
-              -1,
-              -1,
-              NULL,
+            ShellPrintHiiDefaultEx (
               STRING_TOKEN (STR_DRV_DIAG_ITEM_LINE),
               gShellDriver1HiiHandle,
               HandleIndex1,
@@ -307,17 +312,13 @@ DoDiagnostics (
     }
   }
 
-  if (DriverHandleList != NULL) {
-    FreePool (DriverHandleList);
-  }
+Done:
 
-  if (ControllerHandleList != NULL) {
-    FreePool (ControllerHandleList);
-  }
-
-  if (ChildHandleList != NULL) {
-    FreePool (ChildHandleList);
-  }
+  SHELL_FREE_NON_NULL (DriverHandleList);
+  SHELL_FREE_NON_NULL (ControllerHandleList);
+  SHELL_FREE_NON_NULL (ChildHandleList);
+  SHELL_FREE_NON_NULL (Language);
+  SHELL_FREE_NON_NULL (OutBuffer);
 
   return (Status2);
 }
@@ -378,7 +379,7 @@ ShellCommandRunDrvDiag (
   Status = ShellCommandLineParse (ParamList, &Package, &ProblemParam, TRUE);
   if (EFI_ERROR (Status)) {
     if ((Status == EFI_VOLUME_CORRUPTED) && (ProblemParam != NULL)) {
-      ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_PROBLEM), gShellDriver1HiiHandle, L"drvdiag", ProblemParam);
+      ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_PROBLEM), gShellDriver1HiiHandle, L"drvdiag", ProblemParam);
       FreePool (ProblemParam);
       ShellStatus = SHELL_INVALID_PARAMETER;
     } else {
@@ -397,7 +398,7 @@ ShellCommandRunDrvDiag (
       //
       // error for too many parameters
       //
-      ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_TOO_MANY), gShellDriver1HiiHandle, L"drvdiag");
+      ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_TOO_MANY), gShellDriver1HiiHandle, L"drvdiag");
       ShellStatus = SHELL_INVALID_PARAMETER;
     } else if (  (ShellCommandLineGetFlag (Package, L"-s"))
               || (ShellCommandLineGetFlag (Package, L"-e"))
@@ -426,11 +427,17 @@ ShellCommandRunDrvDiag (
     Lang = ShellCommandLineGetValue (Package, L"-l");
     if (ShellCommandLineGetFlag (Package, L"-l") && (Lang == NULL)) {
       ASSERT (Language == NULL);
-      ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_NO_VALUE), gShellDriver1HiiHandle, L"drvdiag", L"-l");
+      ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_NO_VALUE), gShellDriver1HiiHandle, L"drvdiag", L"-l");
       ShellCommandLineFreeVarList (Package);
       return (SHELL_INVALID_PARAMETER);
     } else if (Lang != NULL) {
       Language = AllocateZeroPool (StrSize (Lang));
+      if (Language == NULL) {
+        ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_OUT_MEM), gShellDriver1HiiHandle, L"drvdiag");
+        ShellCommandLineFreeVarList (Package);
+        return (SHELL_OUT_OF_RESOURCES);
+      }
+
       AsciiSPrint (Language, StrSize (Lang), "%S", Lang);
     }
 
@@ -438,25 +445,22 @@ ShellCommandRunDrvDiag (
     ControllerHandleStr = ShellCommandLineGetRawValue (Package, 2);
     ChildHandleStr      = ShellCommandLineGetRawValue (Package, 3);
 
-    if (DriverHandleStr == NULL) {
-      Handle1 = NULL;
-    } else {
-      ShellConvertStringToUint64 (DriverHandleStr, &Intermediate, TRUE, FALSE);
+    if ((DriverHandleStr != NULL) && !EFI_ERROR (ShellConvertStringToUint64 (DriverHandleStr, &Intermediate, TRUE, FALSE))) {
       Handle1 = ConvertHandleIndexToHandle ((UINTN)Intermediate);
+    } else {
+      Handle1 = NULL;
     }
 
-    if (ControllerHandleStr == NULL) {
-      Handle2 = NULL;
-    } else {
-      ShellConvertStringToUint64 (ControllerHandleStr, &Intermediate, TRUE, FALSE);
+    if ((ControllerHandleStr != NULL) && !EFI_ERROR (ShellConvertStringToUint64 (ControllerHandleStr, &Intermediate, TRUE, FALSE))) {
       Handle2 = ConvertHandleIndexToHandle ((UINTN)Intermediate);
+    } else {
+      Handle2 = NULL;
     }
 
-    if (ChildHandleStr == NULL) {
-      Handle3 = NULL;
-    } else {
-      ShellConvertStringToUint64 (ChildHandleStr, &Intermediate, TRUE, FALSE);
+    if ((ChildHandleStr != NULL) && !EFI_ERROR (ShellConvertStringToUint64 (ChildHandleStr, &Intermediate, TRUE, FALSE))) {
       Handle3 = ConvertHandleIndexToHandle ((UINTN)Intermediate);
+    } else {
+      Handle3 = NULL;
     }
 
     Status = DoDiagnostics (

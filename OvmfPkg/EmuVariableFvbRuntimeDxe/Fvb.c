@@ -658,8 +658,8 @@ InitializeFvAndVariableStoreHeaders (
 
       // UINT32  Size;
       (
-       FixedPcdGet32 (PcdFlashNvStorageVariableSize) -
-       OFFSET_OF (FVB_FV_HDR_AND_VARS_TEMPLATE, VarHdr)
+        FixedPcdGet32 (PcdFlashNvStorageVariableSize) -
+        OFFSET_OF (FVB_FV_HDR_AND_VARS_TEMPLATE, VarHdr)
       ),
 
       // UINT8   Format;
@@ -692,6 +692,8 @@ InitializeFvAndVariableStoreHeaders (
   //
   Fv           = (EFI_FIRMWARE_VOLUME_HEADER *)Ptr;
   Fv->Checksum = CalculateCheckSum16 (Ptr, Fv->HeaderLength);
+
+  DEBUG ((DEBUG_INFO, "EMU Variable FVB: Initialized FV using template structure\n"));
 }
 
 /**
@@ -717,6 +719,7 @@ FvbInitialize (
   EFI_HANDLE            Handle;
   EFI_PHYSICAL_ADDRESS  Address;
   RETURN_STATUS         PcdStatus;
+  VOID                  *Template;
 
   DEBUG ((DEBUG_INFO, "EMU Variable FVB Started\n"));
 
@@ -778,8 +781,15 @@ FvbInitialize (
   // Initialize the main FV header and variable store header
   //
   if (Initialize) {
-    SetMem (Ptr, EMU_FVB_SIZE, ERASED_UINT8);
-    InitializeFvAndVariableStoreHeaders (Ptr);
+    Template = (VOID *)(UINTN)PcdGet32 (PcdOvmfFlashNvStorageVariableBase);
+    Status   = ValidateFvHeader (Template);
+    if (!EFI_ERROR (Status)) {
+      DEBUG ((DEBUG_INFO, "EMU Variable FVB: Initialized FV from ROM template.\n"));
+      CopyMem (Ptr, Template, EMU_FVB_SIZE);
+    } else {
+      SetMem (Ptr, EMU_FVB_SIZE, ERASED_UINT8);
+      InitializeFvAndVariableStoreHeaders (Ptr);
+    }
   }
 
   PcdStatus = PcdSet64S (PcdFlashNvStorageVariableBase64, (UINTN)Ptr);

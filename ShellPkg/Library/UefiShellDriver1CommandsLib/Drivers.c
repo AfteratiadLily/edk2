@@ -312,7 +312,7 @@ ShellCommandRunDrivers (
   Status = ShellCommandLineParse (ParamList, &Package, &ProblemParam, TRUE);
   if (EFI_ERROR (Status)) {
     if ((Status == EFI_VOLUME_CORRUPTED) && (ProblemParam != NULL)) {
-      ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_PROBLEM), gShellDriver1HiiHandle, L"drivers", ProblemParam);
+      ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_PROBLEM), gShellDriver1HiiHandle, L"drivers", ProblemParam);
       FreePool (ProblemParam);
       ShellStatus = SHELL_INVALID_PARAMETER;
     } else {
@@ -320,17 +320,23 @@ ShellCommandRunDrivers (
     }
   } else {
     if (ShellCommandLineGetCount (Package) > 1) {
-      ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_TOO_MANY), gShellDriver1HiiHandle, L"drivers");
+      ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_TOO_MANY), gShellDriver1HiiHandle, L"drivers");
       ShellStatus = SHELL_INVALID_PARAMETER;
     } else {
       if (ShellCommandLineGetFlag (Package, L"-l")) {
         Lang = ShellCommandLineGetValue (Package, L"-l");
         if (Lang != NULL) {
           Language = AllocateZeroPool (StrSize (Lang));
+          if (Language == NULL) {
+            ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_OUT_MEM), gShellDriver1HiiHandle, L"drivers");
+            ShellCommandLineFreeVarList (Package);
+            return (SHELL_OUT_OF_RESOURCES);
+          }
+
           AsciiSPrint (Language, StrSize (Lang), "%S", Lang);
         } else {
           ASSERT (Language == NULL);
-          ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_NO_VALUE), gShellDriver1HiiHandle, L"drivers", L"-l");
+          ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_NO_VALUE), gShellDriver1HiiHandle, L"drivers", L"-l");
           ShellCommandLineFreeVarList (Package);
           return (SHELL_INVALID_PARAMETER);
         }
@@ -364,6 +370,13 @@ ShellCommandRunDrivers (
           );
       }
 
+      if (FormatString == NULL) {
+        // Assume the string is present because it is hard-coded and report out of memory
+        ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_OUT_MEM), gShellDriver1HiiHandle, L"drivers");
+        ShellCommandLineFreeVarList (Package);
+        return (SHELL_OUT_OF_RESOURCES);
+      }
+
       HandleList = GetHandleListByProtocol (&gEfiDriverBindingProtocolGuid);
       for (HandleWalker = HandleList; HandleWalker != NULL && *HandleWalker != NULL; HandleWalker++) {
         ChildCount     = 0;
@@ -382,13 +395,17 @@ ShellCommandRunDrivers (
         TruncatedDriverName = NULL;
         if (!SfoFlag && (FullDriverName != NULL)) {
           TruncatedDriverName = AllocateZeroPool ((MAX_LEN_DRIVER_NAME + 1) * sizeof (CHAR16));
+          if (TruncatedDriverName == NULL) {
+            ShellPrintHiiDefaultEx (STRING_TOKEN (STR_GEN_OUT_MEM), gShellDriver1HiiHandle, L"drivers");
+            ShellCommandLineFreeVarList (Package);
+            return (SHELL_OUT_OF_RESOURCES);
+          }
+
           StrnCpyS (TruncatedDriverName, MAX_LEN_DRIVER_NAME + 1, FullDriverName, MAX_LEN_DRIVER_NAME);
         }
 
         if (!SfoFlag) {
-          ShellPrintEx (
-            -1,
-            -1,
+          ShellPrintDefaultEx (
             FormatString,
             ConvertHandleToHandleIndex (*HandleWalker),
             DriverVersion,
@@ -401,9 +418,7 @@ ShellCommandRunDrivers (
             ImageName == NULL ? L"" : ImageName
             );
         } else {
-          ShellPrintEx (
-            -1,
-            -1,
+          ShellPrintDefaultEx (
             FormatString,
             ConvertHandleToHandleIndex (*HandleWalker),
             DriverVersion,

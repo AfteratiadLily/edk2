@@ -261,76 +261,155 @@ FindFileEx (
 }
 
 /**
+  Return the size of a section whether SECTION or SECTION2
+
+  @param  Section           - Pointer to start of section header
+
+  @retval Size in bytes.
+ **/
+STATIC
+UINT32
+GetSectionNSize (
+  IN EFI_COMMON_SECTION_HEADER  *Section
+  )
+{
+  UINT32  SectionSize;
+
+  if (IS_SECTION2 (Section)) {
+    ASSERT (SECTION2_SIZE (Section) > 0x00FFFFFF);
+    SectionSize = SECTION2_SIZE (Section);
+  } else {
+    SectionSize = SECTION_SIZE (Section);
+  }
+
+  return SectionSize;
+}
+
+/**
+  Return the size of a section header whether SECTION or SECTION2
+
+  @param  Section           - Pointer to start of section header
+
+  @retval Size in bytes.
+ **/
+STATIC
+UINT32
+GetCommonSectionNHeaderSize (
+  IN EFI_COMMON_SECTION_HEADER  *Section
+  )
+{
+  if (IS_SECTION2 (Section)) {
+    return sizeof (EFI_COMMON_SECTION_HEADER2);
+  } else {
+    return sizeof (EFI_COMMON_SECTION_HEADER);
+  }
+}
+
+/**
+  Return the size of a compression section header whether SECTION or SECTION2
+
+  @param  Section           - Pointer to start of section header
+
+  @retval Size in bytes.
+ **/
+STATIC
+UINT32
+GetCompressionSectionNHeaderSize (
+  IN EFI_COMMON_SECTION_HEADER  *Section
+  )
+{
+  ASSERT (Section->Type == EFI_SECTION_COMPRESSION);
+
+  if (IS_SECTION2 (Section)) {
+    return sizeof (EFI_COMPRESSION_SECTION2);
+  } else {
+    return sizeof (EFI_COMPRESSION_SECTION);
+  }
+}
+
+/**
+  Return the compression type of a section whether SECTION or SECTION2
+
+  @param  Section           - Pointer to start of section header
+
+  @retval EFI_SECTION_TYPE
+ **/
+STATIC
+EFI_SECTION_TYPE
+GetSectionNCompressionType (
+  IN EFI_COMMON_SECTION_HEADER  *Section
+  )
+{
+  ASSERT (Section->Type == EFI_SECTION_COMPRESSION);
+
+  if (IS_SECTION2 (Section)) {
+    return ((EFI_COMPRESSION_SECTION2 *)Section)->CompressionType;
+  } else {
+    return ((EFI_COMPRESSION_SECTION *)Section)->CompressionType;
+  }
+}
+
+/**
   Go through the file to search SectionType section,
   when meeting an encapsuled section.
 
-  @param  SectionType  - Filter to find only section of this type.
-  @param  Section      - From where to search.
-  @param  SectionSize  - The file size to search.
-  @param  OutputBuffer - Pointer to the section to search.
+  @param  SectionType       - Filter to find only section of this type.
+  @param  SectionCheckHook  - A hook which can check if the section is the target one.
+  @param  Section           - From where to search.
+  @param  SectionSize       - The file size to search.
+  @param  OutputBuffer      - Pointer to the section to search.
 
   @retval EFI_SUCCESS
 **/
 EFI_STATUS
 FfsProcessSection (
   IN EFI_SECTION_TYPE           SectionType,
+  IN FFS_CHECK_SECTION_HOOK     SectionCheckHook,
   IN EFI_COMMON_SECTION_HEADER  *Section,
   IN UINTN                      SectionSize,
   OUT VOID                      **OutputBuffer
   )
 {
-  EFI_STATUS                Status;
-  UINT32                    SectionLength;
-  UINT32                    ParsedLength;
-  EFI_COMPRESSION_SECTION   *CompressionSection;
-  EFI_COMPRESSION_SECTION2  *CompressionSection2;
-  UINT32                    DstBufferSize;
-  VOID                      *ScratchBuffer;
-  UINT32                    ScratchBufferSize;
-  VOID                      *DstBuffer;
-  UINT16                    SectionAttribute;
-  UINT32                    AuthenticationStatus;
-  CHAR8                     *CompressedData;
-  UINT32                    CompressedDataLength;
+  EFI_STATUS  Status;
+  UINT32      SectionLength;
+  UINTN       ParsedLength;
+  UINT32      DstBufferSize;
+  VOID        *DstBuffer;
 
-  *OutputBuffer = NULL;
-  ParsedLength  = 0;
-  Status        = EFI_NOT_FOUND;
+  ParsedLength = 0;
+
   while (ParsedLength < SectionSize) {
-    if (IS_SECTION2 (Section)) {
-      ASSERT (SECTION2_SIZE (Section) > 0x00FFFFFF);
-    }
+    UINT32  SectionHeaderSize;
+
+    SectionHeaderSize = GetCommonSectionNHeaderSize (Section);
 
     if (Section->Type == SectionType) {
-      if (IS_SECTION2 (Section)) {
-        *OutputBuffer = (VOID *)((UINT8 *)Section + sizeof (EFI_COMMON_SECTION_HEADER2));
-      } else {
-        *OutputBuffer = (VOID *)((UINT8 *)Section + sizeof (EFI_COMMON_SECTION_HEADER));
+      if (SectionCheckHook != NULL) {
+        if (SectionCheckHook (Section) != EFI_SUCCESS) {
+          goto CheckNextSection;
+        }
       }
+
+      *OutputBuffer = (VOID *)((UINT8 *)Section + SectionHeaderSize);
 
       return EFI_SUCCESS;
     } else if ((Section->Type == EFI_SECTION_COMPRESSION) || (Section->Type == EFI_SECTION_GUID_DEFINED)) {
+      CHAR8   *CompressedData;
+      UINT32  CompressionSectionHeaderSize;
+      VOID    *ScratchBuffer;
+      UINT32  ScratchBufferSize;
+
       if (Section->Type == EFI_SECTION_COMPRESSION) {
-        if (IS_SECTION2 (Section)) {
-          CompressionSection2 = (EFI_COMPRESSION_SECTION2 *)Section;
-          SectionLength       = SECTION2_SIZE (Section);
+        UINT32  CompressedDataLength;
 
-          if (CompressionSection2->CompressionType != EFI_STANDARD_COMPRESSION) {
-            return EFI_UNSUPPORTED;
-          }
+        CompressionSectionHeaderSize = GetCompressionSectionNHeaderSize (Section);
+        SectionLength                = GetSectionNSize (Section);
 
-          CompressedData       = (CHAR8 *)((EFI_COMPRESSION_SECTION2 *)Section + 1);
-          CompressedDataLength = SectionLength - sizeof (EFI_COMPRESSION_SECTION2);
-        } else {
-          CompressionSection = (EFI_COMPRESSION_SECTION *)Section;
-          SectionLength      = SECTION_SIZE (Section);
+        CompressedData       = (CHAR8 *)((UINTN)(Section) + CompressionSectionHeaderSize);
+        CompressedDataLength = SectionLength - CompressionSectionHeaderSize;
 
-          if (CompressionSection->CompressionType != EFI_STANDARD_COMPRESSION) {
-            return EFI_UNSUPPORTED;
-          }
-
-          CompressedData       = (CHAR8 *)((EFI_COMPRESSION_SECTION *)Section + 1);
-          CompressedDataLength = SectionLength - sizeof (EFI_COMPRESSION_SECTION);
+        if (GetSectionNCompressionType (Section) != EFI_STANDARD_COMPRESSION) {
+          return EFI_UNSUPPORTED;
         }
 
         Status = UefiDecompressGetInfo (
@@ -339,7 +418,10 @@ FfsProcessSection (
                    &DstBufferSize,
                    &ScratchBufferSize
                    );
-      } else if (Section->Type == EFI_SECTION_GUID_DEFINED) {
+      } else {
+        // Section->Type == EFI_SECTION_GUID_DEFINED)
+        UINT16  SectionAttribute;
+
         Status = ExtractGuidedSectionGetInfo (
                    Section,
                    &DstBufferSize,
@@ -376,21 +458,13 @@ FfsProcessSection (
       // DstBuffer still is one section. Adjust DstBuffer offset, skip EFI section header
       // to make section data at page alignment.
       //
-      if (IS_SECTION2 (Section)) {
-        DstBuffer = (UINT8 *)DstBuffer + EFI_PAGE_SIZE - sizeof (EFI_COMMON_SECTION_HEADER2);
-      } else {
-        DstBuffer = (UINT8 *)DstBuffer + EFI_PAGE_SIZE - sizeof (EFI_COMMON_SECTION_HEADER);
-      }
+      DstBuffer = (UINT8 *)DstBuffer + EFI_PAGE_SIZE - SectionHeaderSize;
 
       //
       // Call decompress function
       //
       if (Section->Type == EFI_SECTION_COMPRESSION) {
-        if (IS_SECTION2 (Section)) {
-          CompressedData = (CHAR8 *)((EFI_COMPRESSION_SECTION2 *)Section + 1);
-        } else {
-          CompressedData = (CHAR8 *)((EFI_COMPRESSION_SECTION *)Section + 1);
-        }
+        CompressedData = (CHAR8 *)((UINTN)(Section) + CompressionSectionHeaderSize);
 
         Status = UefiDecompress (
                    CompressedData,
@@ -398,6 +472,8 @@ FfsProcessSection (
                    ScratchBuffer
                    );
       } else if (Section->Type == EFI_SECTION_GUID_DEFINED) {
+        UINT32  AuthenticationStatus;
+
         Status = ExtractGuidedSectionDecode (
                    Section,
                    &DstBuffer,
@@ -412,21 +488,19 @@ FfsProcessSection (
         //
         DEBUG ((DEBUG_ERROR, "Decompress Failed - %r\n", Status));
         return EFI_NOT_FOUND;
-      } else {
-        return FfsProcessSection (
-                 SectionType,
-                 DstBuffer,
-                 DstBufferSize,
-                 OutputBuffer
-                 );
       }
+
+      return FfsProcessSection (
+               SectionType,
+               SectionCheckHook,
+               DstBuffer,
+               DstBufferSize,
+               OutputBuffer
+               );
     }
 
-    if (IS_SECTION2 (Section)) {
-      SectionLength = SECTION2_SIZE (Section);
-    } else {
-      SectionLength = SECTION_SIZE (Section);
-    }
+CheckNextSection:
+    SectionLength = GetSectionNSize (Section);
 
     //
     // SectionLength is adjusted it is 4 byte aligned.
@@ -443,9 +517,11 @@ FfsProcessSection (
 
 /**
   This service enables discovery sections of a given type within a valid FFS file.
+  Caller also can provide a SectionCheckHook to do additional checking.
 
-  @param  SearchType            The value of the section type to find.
-  @param  FfsFileHeader         A pointer to the file header that contains the set of sections to
+  @param  SectionType           The value of the section type to find.
+  @param  SectionCheckHook      A hook which can check if the section is the target one.
+  @param  FileHandle            A pointer to the file header that contains the set of sections to
                                 be searched.
   @param  SectionData           A pointer to the discovered section, if successful.
 
@@ -455,10 +531,11 @@ FfsProcessSection (
 **/
 EFI_STATUS
 EFIAPI
-FfsFindSectionData (
-  IN EFI_SECTION_TYPE     SectionType,
-  IN EFI_PEI_FILE_HANDLE  FileHandle,
-  OUT VOID                **SectionData
+FfsFindSectionDataWithHook (
+  IN EFI_SECTION_TYPE        SectionType,
+  IN FFS_CHECK_SECTION_HOOK  SectionCheckHook,
+  IN EFI_PEI_FILE_HANDLE     FileHandle,
+  OUT VOID                   **SectionData
   )
 {
   EFI_FFS_FILE_HEADER        *FfsFileHeader;
@@ -478,10 +555,34 @@ FfsFindSectionData (
 
   return FfsProcessSection (
            SectionType,
+           SectionCheckHook,
            Section,
            FileSize,
            SectionData
            );
+}
+
+/**
+  This service enables discovery sections of a given type within a valid FFS file.
+
+  @param  SectionType           The value of the section type to find.
+  @param  FileHandle            A pointer to the file header that contains the set of sections to
+                                be searched.
+  @param  SectionData           A pointer to the discovered section, if successful.
+
+  @retval EFI_SUCCESS           The section was found.
+  @retval EFI_NOT_FOUND         The section was not found.
+
+**/
+EFI_STATUS
+EFIAPI
+FfsFindSectionData (
+  IN EFI_SECTION_TYPE     SectionType,
+  IN EFI_PEI_FILE_HANDLE  FileHandle,
+  OUT VOID                **SectionData
+  )
+{
+  return FfsFindSectionDataWithHook (SectionType, NULL, FileHandle, SectionData);
 }
 
 /**
@@ -799,7 +900,7 @@ FfsProcessFvFile (
   //
   // Find FvImage in FvFile
   //
-  Status = FfsFindSectionData (EFI_SECTION_FIRMWARE_VOLUME_IMAGE, FvFileHandle, (VOID **)&FvImageHandle);
+  Status = FfsFindSectionDataWithHook (EFI_SECTION_FIRMWARE_VOLUME_IMAGE, NULL, FvFileHandle, (VOID **)&FvImageHandle);
   if (EFI_ERROR (Status)) {
     return Status;
   }

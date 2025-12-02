@@ -2456,11 +2456,11 @@ X509GetSignatureAlgorithm (
   @param[in, out] ExtensionDataSize Extension bytes size.
 
   @retval TRUE                     The certificate Extension data retrieved successfully.
+  @retval TRUE                     The Certificate Extension is found, but the oid extension is not found.
   @retval FALSE                    If Cert is NULL.
                                    If ExtensionDataSize is NULL.
                                    If ExtensionData is not NULL and *ExtensionDataSize is 0.
                                    If Certificate is invalid.
-  @retval FALSE                    If no Extension entry match Oid.
   @retval FALSE                    If the ExtensionData is NULL. The required buffer size
                                    is returned in the ExtensionDataSize parameter.
   @retval FALSE                    The operation is not supported.
@@ -2826,6 +2826,119 @@ Pkcs1v2Encrypt (
 }
 
 /**
+  Decrypts a blob using PKCS1v2 (RSAES-OAEP) schema. On success, will return the
+  decrypted message in a newly allocated buffer.
+  Things that can cause a failure include:
+  - Fail to parse private key.
+  - Fail to allocate an intermediate buffer.
+  - Null pointer provided for a non-optional parameter.
+  @param[in]  PrivateKey          A pointer to the DER-encoded private key.
+  @param[in]  PrivateKeySize      Size of the private key buffer.
+  @param[in]  EncryptedData       Data to be decrypted.
+  @param[in]  EncryptedDataSize   Size of the encrypted buffer.
+  @param[out] OutData             Pointer to an allocated buffer containing the encrypted
+                                  message.
+  @param[out] OutDataSize         Size of the encrypted message buffer.
+  @retval     TRUE                Encryption was successful.
+  @retval     FALSE               Encryption failed.
+**/
+BOOLEAN
+EFIAPI
+Pkcs1v2Decrypt (
+  IN   CONST UINT8  *PrivateKey,
+  IN   UINTN        PrivateKeySize,
+  IN   UINT8        *EncryptedData,
+  IN   UINTN        EncryptedDataSize,
+  OUT  UINT8        **OutData,
+  OUT  UINTN        *OutDataSize
+  )
+{
+  CALL_CRYPTO_SERVICE (Pkcs1v2Decrypt, (PrivateKey, PrivateKeySize, EncryptedData, EncryptedDataSize, OutData, OutDataSize), FALSE);
+}
+
+/**
+  Encrypts a blob using PKCS1v2 (RSAES-OAEP) schema. On success, will return the
+  encrypted message in a newly allocated buffer.
+  Things that can cause a failure include:
+  - X509 key size does not match any known key size.
+  - Fail to allocate an intermediate buffer.
+  - Null pointer provided for a non-optional parameter.
+  - Data size is too large for the provided key size (max size is a function of key size
+    and hash digest size).
+  @param[in]  RsaContext          A pointer to an RSA context created by RsaNew() and
+                                  provisioned with a public key using RsaSetKey().
+  @param[in]  InData              Data to be encrypted.
+  @param[in]  InDataSize          Size of the data buffer.
+  @param[in]  PrngSeed            [Optional] If provided, a pointer to a random seed buffer
+                                  to be used when initializing the PRNG. NULL otherwise.
+  @param[in]  PrngSeedSize        [Optional] If provided, size of the random seed buffer.
+                                  0 otherwise.
+  @param[in]  DigestLen           [Optional] If provided, size of the hash used:
+                                  SHA1_DIGEST_SIZE
+                                  SHA256_DIGEST_SIZE
+                                  SHA384_DIGEST_SIZE
+                                  SHA512_DIGEST_SIZE
+                                  0 to use default (SHA1)
+  @param[out] EncryptedData       Pointer to an allocated buffer containing the encrypted
+                                  message.
+  @param[out] EncryptedDataSize   Size of the encrypted message buffer.
+  @retval     TRUE                Encryption was successful.
+  @retval     FALSE               Encryption failed.
+**/
+BOOLEAN
+EFIAPI
+RsaOaepEncrypt (
+  IN   VOID         *RsaContext,
+  IN   UINT8        *InData,
+  IN   UINTN        InDataSize,
+  IN   CONST UINT8  *PrngSeed   OPTIONAL,
+  IN   UINTN        PrngSeedSize   OPTIONAL,
+  IN   UINT16       DigestLen   OPTIONAL,
+  OUT  UINT8        **EncryptedData,
+  OUT  UINTN        *EncryptedDataSize
+  )
+{
+  CALL_CRYPTO_SERVICE (RsaOaepEncrypt, (RsaContext, InData, InDataSize, PrngSeed, PrngSeedSize, DigestLen, EncryptedData, EncryptedDataSize), FALSE);
+}
+
+/**
+  Decrypts a blob using PKCS1v2 (RSAES-OAEP) schema. On success, will return the
+  decrypted message in a newly allocated buffer.
+  Things that can cause a failure include:
+  - Fail to parse private key.
+  - Fail to allocate an intermediate buffer.
+  - Null pointer provided for a non-optional parameter.
+  @param[in]  RsaContext          A pointer to an RSA context created by RsaNew() and
+                                  provisioned with a private key using RsaSetKey().
+  @param[in]  EncryptedData       Data to be decrypted.
+  @param[in]  EncryptedDataSize   Size of the encrypted buffer.
+  @param[in]  DigestLen           [Optional] If provided, size of the hash used:
+                                  SHA1_DIGEST_SIZE
+                                  SHA256_DIGEST_SIZE
+                                  SHA384_DIGEST_SIZE
+                                  SHA512_DIGEST_SIZE
+                                  0 to use default (SHA1)
+  @param[out] OutData             Pointer to an allocated buffer containing the encrypted
+                                  message.
+  @param[out] OutDataSize         Size of the encrypted message buffer.
+  @retval     TRUE                Encryption was successful.
+  @retval     FALSE               Encryption failed.
+**/
+BOOLEAN
+EFIAPI
+RsaOaepDecrypt (
+  IN   VOID    *RsaContext,
+  IN   UINT8   *EncryptedData,
+  IN   UINTN   EncryptedDataSize,
+  IN   UINT16  DigestLen   OPTIONAL,
+  OUT  UINT8   **OutData,
+  OUT  UINTN   *OutDataSize
+  )
+{
+  CALL_CRYPTO_SERVICE (RsaOaepDecrypt, (RsaContext, EncryptedData, EncryptedDataSize, DigestLen, OutData, OutDataSize), FALSE);
+}
+
+/**
   Get the signer's certificates from PKCS#7 signed data as described in "PKCS #7:
   Cryptographic Message Syntax Standard". The input signed data could be wrapped
   in a ContentInfo structure.
@@ -2849,6 +2962,7 @@ Pkcs1v2Encrypt (
   @retval  TRUE            The operation is finished successfully.
   @retval  FALSE           Error occurs during the operation.
   @retval  FALSE           This interface is not supported.
+
 
 **/
 BOOLEAN
@@ -4052,6 +4166,27 @@ TlsSetVerifyHost (
 }
 
 /**
+  Set the specified server name in Server/Client.
+
+  @param[in]  Tls           Pointer to the TLS object.
+  @param[in]  SslCtx        Pointer to the SSL object.
+  @param[in]  HostName      The specified server name to be set.
+
+  @retval  EFI_SUCCESS      The Server Name was set successfully.
+  @retval  EFI_UNSUPPORTED  Failed to set the Server Name.
+**/
+EFI_STATUS
+EFIAPI
+TlsSetServerName (
+  VOID   *Tls,
+  VOID   *SslCtx,
+  CHAR8  *HostName
+  )
+{
+  CALL_CRYPTO_SERVICE (TlsSetServerName, (Tls, SslCtx, HostName), EFI_UNSUPPORTED);
+}
+
+/**
   Sets a TLS/SSL session ID to be used during TLS/SSL connect.
 
   This function sets a session ID to be used when the TLS/SSL connection is
@@ -4265,6 +4400,30 @@ TlsSetEcCurve (
   )
 {
   CALL_CRYPTO_SERVICE (TlsSetSignatureAlgoList, (Tls, Data, DataSize), EFI_UNSUPPORTED);
+}
+
+/**
+  Set the Tls security level.
+
+  This function Set the Tls security level.
+  If Tls is NULL, nothing is done.
+
+  @param[in]  Tls                Pointer to the TLS object.
+  @param[in]  Level              Tls Security level need to set.
+
+  @retval  EFI_SUCCESS           The Tls security level was set successfully.
+  @retval  EFI_INVALID_PARAMETER The parameters are invalid.
+  @retval  EFI_UNSUPPORTED       The requested TLS set security level is not supported.
+
+**/
+EFI_STATUS
+EFIAPI
+TlsSetSecurityLevel (
+  IN VOID   *Tls,
+  IN UINT8  Level
+  )
+{
+  CALL_CRYPTO_SERVICE (TlsSetSecurityLevel, (Tls, Level), EFI_UNSUPPORTED);
 }
 
 /**

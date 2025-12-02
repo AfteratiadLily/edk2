@@ -128,7 +128,7 @@ IntersectIoDescriptor (
       EFI_ERROR (Status) ? DEBUG_ERROR : DEBUG_VERBOSE,
       "%a: %a: add [%Lx, %Lx): %r\n",
       gEfiCallerBaseName,
-      __FUNCTION__,
+      __func__,
       IntersectionBase,
       IntersectionEnd,
       Status
@@ -141,7 +141,7 @@ IntersectIoDescriptor (
     "%a: %a: desc [%Lx, %Lx) type %u conflicts with "
     "aperture [%Lx, %Lx)\n",
     gEfiCallerBaseName,
-    __FUNCTION__,
+    __func__,
     Descriptor->BaseAddress,
     Descriptor->BaseAddress + Descriptor->Length,
     (UINT32)Descriptor->GcdIoType,
@@ -178,7 +178,7 @@ AddIoSpace (
       DEBUG_ERROR,
       "%a: %a: GetIoSpaceMap(): %r\n",
       gEfiCallerBaseName,
-      __FUNCTION__,
+      __func__,
       Status
       ));
     return Status;
@@ -299,7 +299,7 @@ IntersectMemoryDescriptor (
       EFI_ERROR (Status) ? DEBUG_ERROR : DEBUG_VERBOSE,
       "%a: %a: add [%Lx, %Lx): %r\n",
       gEfiCallerBaseName,
-      __FUNCTION__,
+      __func__,
       IntersectionBase,
       IntersectionEnd,
       Status
@@ -312,7 +312,7 @@ IntersectMemoryDescriptor (
     "%a: %a: desc [%Lx, %Lx) type %u cap %Lx conflicts "
     "with aperture [%Lx, %Lx) cap %Lx\n",
     gEfiCallerBaseName,
-    __FUNCTION__,
+    __func__,
     Descriptor->BaseAddress,
     Descriptor->BaseAddress + Descriptor->Length,
     (UINT32)Descriptor->GcdMemoryType,
@@ -353,7 +353,7 @@ AddMemoryMappedIoSpace (
       DEBUG_ERROR,
       "%a: %a: GetMemorySpaceMap(): %r\n",
       gEfiCallerBaseName,
-      __FUNCTION__,
+      __func__,
       Status
       ));
     return Status;
@@ -955,7 +955,7 @@ NotifyPhase (
               DEBUG ((
                 DEBUG_ERROR,
                 "[%a:%d] Translation %lx is not aligned to %lx!\n",
-                __FUNCTION__,
+                __func__,
                 DEBUG_LINE_NUMBER,
                 Translation,
                 Alignment
@@ -1569,6 +1569,14 @@ SubmitResources (
         RootBridge->ResAllocNode[Type].Length    = Descriptor->AddrLen;
         RootBridge->ResAllocNode[Type].Alignment = Descriptor->AddrRangeMax;
         RootBridge->ResAllocNode[Type].Status    = ResSubmitted;
+        //
+        // If the PCI root bridge does not support IO space, do not submit requested resources
+        // for allocation.
+        //
+        if ((Type == TypeIo) && (RootBridge->Io.Base > RootBridge->Io.Limit)) {
+          DEBUG ((DEBUG_INFO, " I/O: Resource not submitted. Unsupported aperture.\n"));
+          RootBridge->ResAllocNode[Type].Status = ResNone;
+        }
       }
 
       RootBridge->ResourceSubmitted = TRUE;

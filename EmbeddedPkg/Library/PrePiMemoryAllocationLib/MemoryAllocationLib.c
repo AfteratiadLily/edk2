@@ -99,6 +99,28 @@ AllocateRuntimePages (
 }
 
 /**
+  Allocates one or more 4KB pages of type EfiReservedMemoryType.
+
+  Allocates the number of 4KB pages of type EfiReservedMemoryTypes and returns a pointer to the
+  allocated buffer.  The buffer returned is aligned on a 4KB boundary.  If Pages is 0, then NULL
+  is returned.  If there is not enough memory remaining to satisfy the request, then NULL is
+  returned.
+
+  @param  Pages                 The number of 4 KB pages to allocate.
+
+  @return A pointer to the allocated buffer or NULL if allocation fails.
+
+**/
+VOID *
+EFIAPI
+AllocateReservedPages (
+  IN UINTN  Pages
+  )
+{
+  return InternalAllocatePages (Pages, EfiReservedMemoryType);
+}
+
+/**
   Allocates one or more 4KB pages of type EfiBootServicesData at a specified alignment.
 
   Allocates the number of 4KB pages specified by Pages of type EfiBootServicesData with an
@@ -141,6 +163,58 @@ AllocateAlignedPages (
   // We would rather waste some memory to save PEI code size.
   //
   Memory = (VOID *)(UINTN)AllocatePages (Pages + EFI_SIZE_TO_PAGES (Alignment));
+  if (Alignment == 0) {
+    AlignmentMask = Alignment;
+  } else {
+    AlignmentMask = Alignment - 1;
+  }
+
+  return (VOID *)(UINTN)(((UINTN)Memory + AlignmentMask) & ~AlignmentMask);
+}
+
+/**
+  Allocates one or more 4KB pages of type EfiReservedMemoryType at a specified alignment.
+
+  Allocates the number of 4KB pages specified by Pages of type EfiReservedMemoryType with an
+  alignment specified by Alignment.  The allocated buffer is returned.  If Pages is 0, then NULL is
+  returned.  If there is not enough memory at the specified alignment remaining to satisfy the
+  request, then NULL is returned.
+  If Alignment is not a power of two and Alignment is not zero, then ASSERT().
+
+  @param  Pages                 The number of 4 KB pages to allocate.
+  @param  Alignment             The requested alignment of the allocation.  Must be a power of two.
+                                If Alignment is zero, then byte alignment is used.
+
+  @return A pointer to the allocated buffer or NULL if allocation fails.
+
+**/
+VOID *
+EFIAPI
+AllocateAlignedReservedPages (
+  IN UINTN  Pages,
+  IN UINTN  Alignment
+  )
+{
+  VOID   *Memory;
+  UINTN  AlignmentMask;
+
+  //
+  // Alignment must be a power of two or zero.
+  //
+  ASSERT ((Alignment & (Alignment - 1)) == 0);
+
+  if (Pages == 0) {
+    return NULL;
+  }
+
+  //
+  // Make sure that Pages plus EFI_SIZE_TO_PAGES (Alignment) does not overflow.
+  //
+  ASSERT (Pages <= (MAX_ADDRESS - EFI_SIZE_TO_PAGES (Alignment)));
+  //
+  // We would rather waste some memory to save PEI code size.
+  //
+  Memory = (VOID *)(UINTN)AllocateReservedPages (Pages + EFI_SIZE_TO_PAGES (Alignment));
   if (Alignment == 0) {
     AlignmentMask = Alignment;
   } else {
@@ -268,4 +342,61 @@ FreePool (
   )
 {
   // Not implemented yet
+}
+
+/**
+  Reallocates a buffer of type EfiBootServicesData.
+
+  Allocates and zeros the number bytes specified by NewSize from memory of type
+  EfiBootServicesData.  If OldBuffer is not NULL, then the smaller of OldSize and
+  NewSize bytes are copied from OldBuffer to the newly allocated buffer, and
+  OldBuffer is freed.  A pointer to the newly allocated buffer is returned.
+  If NewSize is 0, then a valid buffer of 0 size is  returned.  If there is not
+  enough memory remaining to satisfy the request, then NULL is returned.
+
+  If the allocation of the new buffer is successful and the smaller of NewSize and OldSize
+  is greater than (MAX_ADDRESS - OldBuffer + 1), then ASSERT().
+
+  @param  OldSize        The size, in bytes, of OldBuffer.
+  @param  NewSize        The size, in bytes, of the buffer to reallocate.
+  @param  OldBuffer      The buffer to copy to the allocated buffer.  This is an optional
+                         parameter that may be NULL.
+
+  @return A pointer to the allocated buffer or NULL if allocation fails.
+
+**/
+VOID *
+EFIAPI
+ReallocatePool (
+  IN UINTN  OldSize,
+  IN UINTN  NewSize,
+  IN VOID   *OldBuffer  OPTIONAL
+  )
+{
+  VOID  *NewBuffer;
+
+  // Validate the OldBuffer is HobAllocated.
+  DEBUG_CODE_BEGIN ();
+  EFI_HOB_HANDOFF_INFO_TABLE  *HandOffHob;
+
+  if (OldBuffer != NULL) {
+    HandOffHob = GetHobList ();
+    ASSERT (((EFI_PHYSICAL_ADDRESS)(UINTN)OldBuffer >= HandOffHob->EfiMemoryBottom));
+    ASSERT (((EFI_PHYSICAL_ADDRESS)((UINTN)OldBuffer + OldSize) <= HandOffHob->EfiFreeMemoryBottom));
+  }
+
+  DEBUG_CODE_END ();
+
+  // If new buffer would be smaller just return old buffer as FreePool isn't supported.
+  if ((OldBuffer != NULL) && (OldSize >= NewSize)) {
+    return OldBuffer;
+  }
+
+  NewBuffer = AllocateZeroPool (NewSize);
+  if ((NewBuffer != NULL) && (OldBuffer != NULL)) {
+    CopyMem (NewBuffer, OldBuffer, MIN (OldSize, NewSize));
+    FreePool (OldBuffer);
+  }
+
+  return NewBuffer;
 }

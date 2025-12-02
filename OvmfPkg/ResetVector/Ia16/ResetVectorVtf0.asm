@@ -49,6 +49,18 @@ guidedStructureStart:
 
 %ifdef ARCH_X64
 ;
+; IGVM Metadata offset block
+;
+; GUID : 784fa70e-3176-4677-8a20-04b68699e374
+;
+igvmMetadataOffsetStart:
+    DD      fourGigabytes - IgvmParamStart
+    DW      igvmMetadataOffsetEnd - igvmMetadataOffsetStart
+    DB      0x0E, 0xA7, 0x4F, 0x78, 0x76, 0x31, 0x77, 0x46
+    DB      0x8A, 0x20, 0x04, 0xB6, 0x86, 0x99, 0xE3, 0x74
+igvmMetadataOffsetEnd:
+
+;
 ; TDX Metadata offset block
 ;
 ; TdxMetadata.asm is included in ARCH_X64 because Inte TDX is only
@@ -160,22 +172,13 @@ guidedStructureEnd:
 
 ALIGN   16
 
-applicationProcessorEntryPoint:
 ;
-; Application Processors entry point
+; 0xffffffe0
 ;
-; GenFv generates code aligned on a 4k boundary which will jump to this
-; location.  (0xffffffe0)  This allows the Local APIC Startup IPI to be
-; used to wake up the application processors.
-;
-    jmp     EarlyApInitReal16
-
-ALIGN   8
-
-    DD      0
+    DD      0, 0, 0
 
 ;
-; The VTF signature
+; The VTF signature (0xffffffec)
 ;
 ; VTF-0 means that the VTF (Volume Top File) code does not require
 ; any fixups.

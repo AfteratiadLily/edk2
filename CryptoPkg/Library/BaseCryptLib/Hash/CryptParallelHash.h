@@ -21,6 +21,9 @@ and related or neighboring rights to the source code in this file.
 http://creativecommons.org/publicdomain/zero/1.0/
 **/
 
+#ifndef CRYPT_PARALLEL_HASH_H_
+#define CRYPT_PARALLEL_HASH_H_
+
 #include "InternalCryptLib.h"
 
 #define KECCAK1600_WIDTH  1600
@@ -66,7 +69,8 @@ SHA3_squeeze (
   uint64_t       A[5][5],
   unsigned char  *out,
   size_t         len,
-  size_t         r
+  size_t         r,
+  int            next
   );
 
 /**
@@ -201,3 +205,28 @@ CShake256HashAll (
   IN   UINTN       CustomizationLen,
   OUT  UINT8       *HashValue
   );
+
+/**
+  Complete computation of digest of each block.
+
+  Each AP perform the function called by BSP.
+
+  @param[in] ProcedureArgument Argument of the procedure.
+**/
+VOID
+EFIAPI
+ParallelHashApExecute (
+  IN VOID  *ProcedureArgument
+  );
+
+/**
+  Dispatch the block task to each AP.
+
+**/
+VOID
+EFIAPI
+DispatchBlockToAp (
+  VOID
+  );
+
+#endif // CRYPT_PARALLEL_HASH_H_

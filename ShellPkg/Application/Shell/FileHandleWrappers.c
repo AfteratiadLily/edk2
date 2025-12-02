@@ -1492,7 +1492,7 @@ PrintCommandHistory (
   UINTN        LineNumber;
   UINTN        LineCount;
 
-  ShellPrintEx (-1, -1, L"\n");
+  ShellPrintDefaultEx (L"\n");
   Index      = 0;
   LineNumber = 0;
   //
@@ -1516,7 +1516,7 @@ PrintCommandHistory (
       LineNumber = 0;
     }
 
-    ShellPrintEx (-1, -1, L"%2d. %s\n", Index, Node->Buffer);
+    ShellPrintDefaultEx (L"%2d. %s\n", Index, Node->Buffer);
     LineNumber += LineCount;
   }
 }
@@ -2144,6 +2144,10 @@ FileInterfaceFileWrite (
     // Ascii
     //
     AsciiBuffer = AllocateZeroPool (*BufferSize);
+    if (AsciiBuffer == NULL) {
+      return EFI_OUT_OF_RESOURCES;
+    }
+
     AsciiSPrint (AsciiBuffer, *BufferSize, "%S", Buffer);
     Size   = AsciiStrSize (AsciiBuffer) - 1; // (we dont need the null terminator)
     Status = (((EFI_FILE_PROTOCOL_FILE *)This)->Orig->Write (((EFI_FILE_PROTOCOL_FILE *)This)->Orig, &Size, AsciiBuffer));

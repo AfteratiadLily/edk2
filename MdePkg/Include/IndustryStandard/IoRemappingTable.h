@@ -3,11 +3,16 @@
 
   Copyright (c) 2017, Linaro Limited. All rights reserved.<BR>
   Copyright (c) 2018 - 2022, Arm Limited. All rights reserved.<BR>
+  Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.<BR>
 
   SPDX-License-Identifier: BSD-2-Clause-Patent
 
   @par Reference(s):
   - IO Remapping Table, Platform Design Document, Revision E.d, Feb 2022
+    (https://developer.arm.com/documentation/den0049/)
+  - IO Remapping Table, Platform Design Document, Revision E.e, Sept 2022
+    (https://developer.arm.com/documentation/den0049/)
+  - IO Remapping Table, Platform Design Document, Revision E.f, April 2024
     (https://developer.arm.com/documentation/den0049/)
 
   @par Glossary:
@@ -24,6 +29,7 @@
 #define EFI_ACPI_IO_REMAPPING_TABLE_REVISION_00  0x0
 #define EFI_ACPI_IO_REMAPPING_TABLE_REVISION_04  0x4   // Deprecated
 #define EFI_ACPI_IO_REMAPPING_TABLE_REVISION_05  0x5
+#define EFI_ACPI_IO_REMAPPING_TABLE_REVISION_06  0x6
 
 #define EFI_ACPI_IORT_TYPE_ITS_GROUP     0x0
 #define EFI_ACPI_IORT_TYPE_NAMED_COMP    0x1
@@ -40,8 +46,9 @@
 #define EFI_ACPI_IORT_MEM_ACCESS_PROP_AH_RA   BIT2
 #define EFI_ACPI_IORT_MEM_ACCESS_PROP_AH_AHO  BIT3
 
-#define EFI_ACPI_IORT_MEM_ACCESS_FLAGS_CPM   BIT0
-#define EFI_ACPI_IORT_MEM_ACCESS_FLAGS_DACS  BIT1
+#define EFI_ACPI_IORT_MEM_ACCESS_FLAGS_CPM     BIT0
+#define EFI_ACPI_IORT_MEM_ACCESS_FLAGS_DACS    BIT1
+#define EFI_ACPI_IORT_MEM_ACCESS_FLAGS_CANWBS  BIT2
 
 #define EFI_ACPI_IORT_SMMUv1v2_MODEL_v1             0x0
 #define EFI_ACPI_IORT_SMMUv1v2_MODEL_v2             0x1
@@ -57,8 +64,10 @@
 #define EFI_ACPI_IORT_SMMUv1v2_INT_FLAG_EDGE   0x1
 
 #define EFI_ACPI_IORT_SMMUv3_FLAG_COHAC_OVERRIDE    BIT0
-#define EFI_ACPI_IORT_SMMUv3_FLAG_HTTU_OVERRIDE     BIT1
+#define EFI_ACPI_IORT_SMMUv3_FLAG_HTTU_OVERRIDE     BIT1  // HW update of Access Flag supported
+#define EFI_ACPI_IORT_SMMUv3_FLAG_HTTU_OVERRIDE_DS  BIT2  // HW update of Access Flag + Dirty Flag supported
 #define EFI_ACPI_IORT_SMMUv3_FLAG_PROXIMITY_DOMAIN  BIT3
+#define EFI_ACPI_IORT_SMMUv3_FLAG_DEVICEID_VALID    BIT4
 
 #define EFI_ACPI_IORT_SMMUv3_MODEL_GENERIC           0x0
 #define EFI_ACPI_IORT_SMMUv3_MODEL_HISILICON_HI161X  0x1
@@ -74,7 +83,10 @@
 #define EFI_ACPI_IORT_ROOT_COMPLEX_PASID_FWD_SUPPORTED    BIT2
 
 #define EFI_ACPI_IORT_ROOT_COMPLEX_PASID_UNSUPPORTED  0x0
-#define EFI_ACPI_IORT_ROOT_COMPLEX_PASID_SUPPORTED    BIT1
+#define EFI_ACPI_IORT_ROOT_COMPLEX_PASID_SUPPORTED    BIT0
+
+#define EFI_ACPI_IORT_ROOT_COMPLEX_PASID_MIN_CAPABILITY  0x00
+#define EFI_ACPI_IORT_ROOT_COMPLEX_PASID_MAX_CAPABILITY  0x14
 
 #define EFI_ACPI_IORT_RMR_REMAP_NOT_PERMITTED  0x0
 #define EFI_ACPI_IORT_RMR_REMAP_PERMITTED      BIT0
@@ -139,7 +151,7 @@ typedef struct {
 } EFI_ACPI_6_0_IO_REMAPPING_ITS_NODE;
 
 ///
-/// Node type 1: root complex node
+/// Node type 2: root complex node
 ///
 typedef struct {
   EFI_ACPI_6_0_IO_REMAPPING_NODE    Node;
@@ -158,7 +170,7 @@ typedef struct {
 } EFI_ACPI_6_0_IO_REMAPPING_RC_NODE;
 
 ///
-/// Node type 2: named component node
+/// Node type 1: named component node
 ///
 typedef struct {
   EFI_ACPI_6_0_IO_REMAPPING_NODE    Node;

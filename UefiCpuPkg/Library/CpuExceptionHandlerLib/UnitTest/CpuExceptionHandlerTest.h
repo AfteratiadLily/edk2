@@ -24,7 +24,7 @@
       2. Register values in mActualContextAfterException are the same with register values mActualContextAfterException.
 
   d.Test if stack overflow can be captured by CpuStackGuard in both Bsp and AP.
-    In this test case, stack overflow is triggered by a funtion which calls itself continuously. This test case triggers stack
+    In this test case, stack overflow is triggered by a function which calls itself continuously. This test case triggers stack
     overflow in both BSP and AP. All AP use same Idt with Bsp. The expectation is:
       1. PF exception is triggered (leading to a DF if sepereated stack is not prepared for PF) when Rsp <= StackBase + SIZE_4KB
          since [StackBase, StackBase + SIZE_4KB] is marked as not present in page table when PcdCpuStackGuard is TRUE.
@@ -66,8 +66,8 @@ typedef struct {
 } CPU_REGISTER_BUFFER;
 
 typedef union {
-  EDKII_PEI_MP_SERVICES2_PPI    *Ppi;
-  EFI_MP_SERVICES_PROTOCOL      *Protocol;
+  EFI_PEI_MP_SERVICES2_PPI    *Ppi;
+  EFI_MP_SERVICES_PROTOCOL    *Protocol;
 } MP_SERVICES;
 
 typedef struct {
@@ -212,7 +212,7 @@ CompareCpuContext (
   );
 
 /**
-  Get EFI_MP_SERVICES_PROTOCOL/EDKII_PEI_MP_SERVICES2_PPI pointer.
+  Get EFI_MP_SERVICES_PROTOCOL/EFI_PEI_MP_SERVICES2_PPI pointer.
 
   @param[out] MpServices    Pointer to the MP_SERVICES buffer
 

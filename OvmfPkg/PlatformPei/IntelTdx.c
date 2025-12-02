@@ -18,6 +18,7 @@
 #include <Library/QemuFwCfgLib.h>
 #include <Library/PeiServicesLib.h>
 #include <Library/TdxLib.h>
+#include <Library/TdxHelperLib.h>
 #include <Library/PlatformInitLib.h>
 #include <WorkArea.h>
 #include <ConfidentialComputingGuestAttr.h>
@@ -45,7 +46,5 @@ IntelTdxInitialize (
   PcdStatus = PcdSet64S (PcdTdxSharedBitMask, TdSharedPageMask ());
   ASSERT_RETURN_ERROR (PcdStatus);
 
-  PcdStatus = PcdSetBoolS (PcdSetNxForStack, TRUE);
-  ASSERT_RETURN_ERROR (PcdStatus);
  #endif
 }

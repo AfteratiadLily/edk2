@@ -596,7 +596,7 @@ UsbHubInit (
     }
   }
 
-  if (Index == NumEndpoints) {
+  if ((Index == NumEndpoints) || (EpDesc == NULL)) {
     DEBUG ((DEBUG_ERROR, "UsbHubInit: no interrupt endpoint found for hub %d\n", HubDev->Address));
     return EFI_DEVICE_ERROR;
   }
@@ -609,7 +609,7 @@ UsbHubInit (
   Status  = UsbHubReadDesc (HubDev, HubDesc);
 
   if (EFI_ERROR (Status)) {
-    DEBUG ((DEBUG_ERROR, "UsbHubInit: failed to read HUB descriptor %r\n", Status));
+    DEBUG ((DEBUG_ERROR, "UsbHubInit: failed to read HUB descriptor - %r\n", Status));
     return Status;
   }
 

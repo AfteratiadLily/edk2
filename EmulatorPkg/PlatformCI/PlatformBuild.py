@@ -70,7 +70,6 @@ class SettingsManager(UpdateSettingsManager, SetupSettingsManager, PrEvalSetting
         ret = RunCmd("git", "config --file .gitmodules --get-regexp path", workingdir=self.GetWorkspaceRoot(), outstream=result)
         # Cmd output is expected to look like:
         # submodule.CryptoPkg/Library/OpensslLib/openssl.path CryptoPkg/Library/OpensslLib/openssl
-        # submodule.SoftFloat.path ArmPkg/Library/ArmSoftFloatLib/berkeley-softfloat-3
         if ret == 0:
             for line in result.getvalue().splitlines():
                 _, _, path = line.partition(" ")
@@ -186,11 +185,11 @@ class PlatformBuilder(UefiBuilder, BuildSettingsManager):
     def SetPlatformEnv(self):
         logging.debug("PlatformBuilder SetPlatformEnv")
         self.env.SetValue("PRODUCT_NAME", "EmulatorPkg", "Platform Hardcoded")
-        self.env.SetValue("TOOL_CHAIN_TAG", "VS2019", "Default Toolchain")
+        self.env.SetValue("TOOL_CHAIN_TAG", "VS2022", "Default Toolchain")
 
         # Add support for using the correct Platform Headers, tools, and Libs based on emulator architecture
-        # requested to be built when building VS2019 or VS2017
-        if self.env.GetValue("TOOL_CHAIN_TAG") == "VS2019" or self.env.GetValue("TOOL_CHAIN_TAG") == "VS2017":
+        # requested to be built when building VS2022 or VS2019
+        if self.env.GetValue("TOOL_CHAIN_TAG") == "VS2022" or self.env.GetValue("TOOL_CHAIN_TAG") == "VS2019":
             key = self.env.GetValue("TOOL_CHAIN_TAG") + "_HOST"
             if self.env.GetValue("TARGET_ARCH") == "IA32":
                 shell_environment.ShellEnvironment().set_shell_var(key, "x86")

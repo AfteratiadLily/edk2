@@ -1,7 +1,7 @@
 /** @file
   Ia32-specific functionality for DxeLoad.
 
-Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2006 - 2023, Intel Corporation. All rights reserved.<BR>
 Copyright (c) 2017, AMD Incorporated. All rights reserved.<BR>
 
 SPDX-License-Identifier: BSD-2-Clause-Patent
@@ -166,7 +166,7 @@ Create4GPageTablesIa32Pae (
   // Protect the page table by marking the memory used for page table to be
   // read-only.
   //
-  EnablePageTableProtection ((UINTN)PageMap, FALSE);
+  EnablePageTableProtection ((UINTN)PageMap, 3);
 
   return (UINTN)PageMap;
 }
@@ -265,21 +265,13 @@ HandOffToDxeCore (
   EFI_PEI_VECTOR_HANDOFF_INFO_PPI  *VectorHandoffInfoPpi;
   BOOLEAN                          BuildPageTablesIa32Pae;
 
-  //
-  // Clear page 0 and mark it as allocated if NULL pointer detection is enabled.
-  //
-  if (IsNullDetectionEnabled ()) {
-    ClearFirst4KPage (HobList.Raw);
-    BuildMemoryAllocationHob (0, EFI_PAGES_TO_SIZE (1), EfiBootServicesData);
-  }
-
   Status = PeiServicesAllocatePages (EfiBootServicesData, EFI_SIZE_TO_PAGES (STACK_SIZE), &BaseOfStack);
   ASSERT_EFI_ERROR (Status);
 
   if (FeaturePcdGet (PcdDxeIplSwitchToLongMode)) {
     //
     // Compute the top of the stack we were allocated, which is used to load X64 dxe core.
-    // Pre-allocate a 32 bytes which confroms to x64 calling convention.
+    // Pre-allocate a 32 bytes which conforms to x64 calling convention.
     //
     // The first four parameters to a function are passed in rcx, rdx, r8 and r9.
     // Any further parameters are pushed on the stack. Furthermore, space (4 * 8bytes) for the
@@ -369,7 +361,7 @@ HandOffToDxeCore (
     DEBUG ((
       DEBUG_INFO,
       "%a() Stack Base: 0x%lx, Stack Size: 0x%x\n",
-      __FUNCTION__,
+      __func__,
       BaseOfStack,
       STACK_SIZE
       ));
@@ -457,7 +449,7 @@ HandOffToDxeCore (
     DEBUG ((
       DEBUG_INFO,
       "%a() Stack Base: 0x%lx, Stack Size: 0x%x\n",
-      __FUNCTION__,
+      __func__,
       BaseOfStack,
       STACK_SIZE
       ));

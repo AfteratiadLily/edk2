@@ -3,10 +3,6 @@
 
 Copyright (c) 2006 - 2019, Intel Corporation. All rights reserved.<BR>
 Copyright (c) 1985 - 2022, American Megatrends International LLC.<BR>
-<<<<<<< HEAD
-=======
-
->>>>>>> ace365b4e0 (MdeModulePkg/scsi :Coverity scan flags multiple issues in edk2-stable202205)
 SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
@@ -201,6 +197,65 @@ ScsiDiskDriverBindingSupported (
 }
 
 /**
+ Check whether the SCSI disk is write protected.
+
+ @param[in]  ScsiDiskDevice         The SCSI disk device.
+ @param[out] WriteProtectionEnabled A pointer to a Boolean that will be set to TRUE if the disk is write protected,
+                                    FALSE otherwise.
+
+ @retval EFI_SUCCESS                The operation completed successfully.
+ @retval other                      An error occurred while executing the SCSI command.
+ */
+STATIC
+EFI_STATUS
+IsWriteProtected (
+  IN OUT SCSI_DISK_DEV  *ScsiDiskDevice,
+  OUT BOOLEAN           *WriteProtectionEnabled
+  )
+{
+  EFI_STATUS                       Status;
+  EFI_SCSI_IO_SCSI_REQUEST_PACKET  CommandPacket;
+  UINT8                            Cdb[6];
+  UINT8                            DataBuffer[64];
+
+  if ((ScsiDiskDevice == NULL) || (ScsiDiskDevice->ScsiIo == NULL) || (WriteProtectionEnabled == NULL)) {
+    return EFI_INVALID_PARAMETER;
+  }
+
+  //
+  // Initialize SCSI REQUEST_PACKET and 6-byte Cdb
+  //
+  ZeroMem (&CommandPacket, sizeof (CommandPacket));
+  ZeroMem (Cdb, sizeof (Cdb));
+
+  // Initialize output parameter to default value
+  *WriteProtectionEnabled = FALSE;
+
+  Cdb[0] = ATA_CMD_MODE_SENSE6;
+  Cdb[1] = BIT3;                         // Setting the bit for Disable Block Descriptor
+  Cdb[2] = ATA_PAGE_CODE_RETURN_ALL_PAGES;
+  Cdb[4] = sizeof (DataBuffer);
+
+  CommandPacket.Timeout          = SCSI_DISK_TIMEOUT;
+  CommandPacket.Cdb              = Cdb;
+  CommandPacket.CdbLength        = (UINT8)sizeof (Cdb);
+  CommandPacket.InDataBuffer     = &DataBuffer;
+  CommandPacket.InTransferLength = sizeof (DataBuffer);
+
+  Status = ScsiDiskDevice->ScsiIo->ExecuteScsiCommand (ScsiDiskDevice->ScsiIo, &CommandPacket, NULL);
+
+  if (EFI_ERROR (Status)) {
+    return Status;
+  }
+
+  // Mode Sense 6 Byte Command returns the Write Protection status in the 3rd byte
+  // Bit 7 of the 3rd byte indicates the Write Protection status
+  // See SCSI Block Commands - 3 section 6.3.1 and SCSI-2 Spec, 8.3.3.
+  *WriteProtectionEnabled = (DataBuffer[2] & BIT7) != 0;
+  return EFI_SUCCESS;
+}
+
+/**
   Start this driver on ControllerHandle.
 
   This service is called by the EFI boot service ConnectController(). In order
@@ -238,6 +293,7 @@ ScsiDiskDriverBindingStart (
   CHAR8                 VendorStr[VENDOR_IDENTIFICATION_LENGTH + 1];
   CHAR8                 ProductStr[PRODUCT_IDENTIFICATION_LENGTH + 1];
   CHAR16                DeviceStr[VENDOR_IDENTIFICATION_LENGTH + PRODUCT_IDENTIFICATION_LENGTH + 2];
+  BOOLEAN               WriteProtectionEnabled = FALSE;
 
   MustReadCapacity = TRUE;
 
@@ -299,6 +355,17 @@ ScsiDiskDriverBindingStart (
     case EFI_SCSI_TYPE_WLUN:
       MustReadCapacity = FALSE;
       break;
+  }
+
+  if (ScsiDiskDevice->DeviceType == EFI_SCSI_TYPE_DISK) {
+    Status = IsWriteProtected (ScsiDiskDevice, &WriteProtectionEnabled);
+    if (EFI_ERROR (Status)) {
+      DEBUG ((DEBUG_ERROR, "ScsiDisk: IsWriteProtected() fails. Status = %r\n", Status));
+    }
+
+    if (WriteProtectionEnabled) {
+      ScsiDiskDevice->BlkIo.Media->ReadOnly = TRUE;
+    }
   }
 
   //
@@ -1901,7 +1968,9 @@ Done:
   function shall return EFI_DEVICE_ERROR.
 
   @param  This                         Indicates a pointer to the calling context.
-  @param  MediaId                      ID of the medium to receive data from.
+  @param  MediaId                      ID of the medium to receive data from. If there is no
+                                       block IO protocol supported by the physical device, the
+                                       value of MediaId is undefined.
   @param  Timeout                      The timeout, in 100ns units, to use for the execution
                                        of the security protocol command. A Timeout value of 0
                                        means that this function will wait indefinitely for the
@@ -2033,7 +2102,7 @@ ScsiDiskReceiveData (
       goto Done;
     }
 
-    if ((ScsiDiskDevice->ScsiIo->IoAlign > 1) && !IS_ALIGNED (PayloadBuffer, ScsiDiskDevice->ScsiIo->IoAlign)) {
+    if ((ScsiDiskDevice->ScsiIo->IoAlign > 1) && !ADDRESS_IS_ALIGNED (PayloadBuffer, ScsiDiskDevice->ScsiIo->IoAlign)) {
       AlignedBuffer = AllocateAlignedBuffer (ScsiDiskDevice, PayloadBufferSize);
       if (AlignedBuffer == NULL) {
         Status = EFI_OUT_OF_RESOURCES;
@@ -2123,7 +2192,9 @@ Done:
   shall return EFI_DEVICE_ERROR.
 
   @param  This                         Indicates a pointer to the calling context.
-  @param  MediaId                      ID of the medium to receive data from.
+  @param  MediaId                      ID of the medium to receive data from. If there is no
+                                       block IO protocol supported by the physical device, the
+                                       value of MediaId is undefined.
   @param  Timeout                      The timeout, in 100ns units, to use for the execution
                                        of the security protocol command. A Timeout value of 0
                                        means that this function will wait indefinitely for the
@@ -2253,7 +2324,7 @@ ScsiDiskSendData (
       goto Done;
     }
 
-    if ((ScsiDiskDevice->ScsiIo->IoAlign > 1) && !IS_ALIGNED (PayloadBuffer, ScsiDiskDevice->ScsiIo->IoAlign)) {
+    if ((ScsiDiskDevice->ScsiIo->IoAlign > 1) && !ADDRESS_IS_ALIGNED (PayloadBuffer, ScsiDiskDevice->ScsiIo->IoAlign)) {
       AlignedBuffer = AllocateAlignedBuffer (ScsiDiskDevice, PayloadBufferSize);
       if (AlignedBuffer == NULL) {
         Status = EFI_OUT_OF_RESOURCES;
@@ -2535,8 +2606,8 @@ ScsiDiskInquiryDevice (
   EFI_SCSI_SENSE_DATA                    *SenseDataArray;
   UINTN                                  NumberOfSenseKeys;
   EFI_STATUS                             Status;
-  UINT8                                  MaxRetry;
-  UINT8                                  Index;
+  UINTN                                  MaxRetry;
+  UINTN                                  Index;
   EFI_SCSI_SUPPORTED_VPD_PAGES_VPD_PAGE  *SupportedVpdPages;
   EFI_SCSI_BLOCK_LIMITS_VPD_PAGE         *BlockLimits;
   UINTN                                  PageLength;
@@ -2597,7 +2668,7 @@ ScsiDiskInquiryDevice (
           DEBUG ((
             DEBUG_WARN,
             "%a: invalid PageLength (%u) in Supported VPD Pages page\n",
-            __FUNCTION__,
+            __func__,
             (UINT32)PageLength
             ));
           PageLength = 0;
@@ -2610,7 +2681,7 @@ ScsiDiskInquiryDevice (
           DEBUG ((
             DEBUG_WARN,
             "%a: Supported VPD Pages page doesn't start with code 0x%02x\n",
-            __FUNCTION__,
+            __func__,
             EFI_SCSI_PAGE_CODE_SUPPORTED_VPD
             ));
           PageLength = 0;
@@ -2630,7 +2701,7 @@ ScsiDiskInquiryDevice (
             DEBUG ((
               DEBUG_WARN,
               "%a: non-ascending code in Supported VPD Pages page @ %u\n",
-              __FUNCTION__,
+              __func__,
               Index
               ));
             Index      = 0;
@@ -5851,27 +5922,15 @@ DetermineInstallBlockIo (
   IN  EFI_HANDLE  ChildHandle
   )
 {
-  EFI_SCSI_PASS_THRU_PROTOCOL      *ScsiPassThru;
   EFI_EXT_SCSI_PASS_THRU_PROTOCOL  *ExtScsiPassThru;
 
   //
-  // Firstly, check if ExtScsiPassThru Protocol parent handle exists. If existence,
+  // Check if ExtScsiPassThru Protocol parent handle exists. If it does,
   // check its attribute, logic or physical.
   //
   ExtScsiPassThru = (EFI_EXT_SCSI_PASS_THRU_PROTOCOL *)GetParentProtocol (&gEfiExtScsiPassThruProtocolGuid, ChildHandle);
   if (ExtScsiPassThru != NULL) {
-    if ((ExtScsiPassThru->Mode->Attributes & EFI_SCSI_PASS_THRU_ATTRIBUTES_LOGICAL) != 0) {
-      return TRUE;
-    }
-  }
-
-  //
-  // Secondly, check if ScsiPassThru Protocol parent handle exists. If existence,
-  // check its attribute, logic or physical.
-  //
-  ScsiPassThru = (EFI_SCSI_PASS_THRU_PROTOCOL *)GetParentProtocol (&gEfiScsiPassThruProtocolGuid, ChildHandle);
-  if (ScsiPassThru != NULL) {
-    if ((ScsiPassThru->Mode->Attributes & EFI_SCSI_PASS_THRU_ATTRIBUTES_LOGICAL) != 0) {
+    if ((ExtScsiPassThru->Mode->Attributes & EFI_EXT_SCSI_PASS_THRU_ATTRIBUTES_LOGICAL) != 0) {
       return TRUE;
     }
   }

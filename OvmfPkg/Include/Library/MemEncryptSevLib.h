@@ -167,6 +167,32 @@ MemEncryptSevGetEncryptionMask (
   );
 
 /**
+  Returns a boolean to indicate whether DebugVirtualization is enabled.
+
+  @retval TRUE           DebugVirtualization is enabled
+  @retval FALSE          DebugVirtualization is not enabled
+**/
+BOOLEAN
+EFIAPI
+MemEncryptSevEsDebugVirtualizationIsEnabled (
+  VOID
+  );
+
+/**
+  Returns a boolean to indicate whether the SEV-SNP cache line eviction
+  mitigation is needed.
+
+  @retval TRUE           Cache line eviction mitigation required
+  @retval FALSE          Cache line eviction migigation not required
+
+**/
+BOOLEAN
+EFIAPI
+MemEncryptSevSnpDoCoherencyMitigation (
+  VOID
+  );
+
+/**
   Returns the encryption state of the specified virtual address range.
 
   @param[in]  Cr3BaseAddress          Cr3 Base Address (if zero then use

@@ -54,7 +54,7 @@ Q35TsegMbytesInitialization (
       DEBUG_ERROR,
       "%a: no TSEG (SMRAM) on host bridge DID=0x%04x; "
       "only DID=0x%04x (Q35) is supported\n",
-      __FUNCTION__,
+      __func__,
       mHostBridgeDevId,
       INTEL_Q35_MCH_DEVICE_ID
       ));
@@ -88,7 +88,7 @@ Q35TsegMbytesInitialization (
   DEBUG ((
     DEBUG_INFO,
     "%a: QEMU offers an extended TSEG (%d MB)\n",
-    __FUNCTION__,
+    __func__,
     ExtendedTsegMbytes
     ));
   PcdStatus = PcdSet16S (PcdQ35TsegMbytes, ExtendedTsegMbytes);
@@ -216,16 +216,6 @@ GetPeiMemoryCap (
   UINTN    TotalPages;
 
   //
-  // If DXE is 32-bit, then just return the traditional 64 MB cap.
-  //
- #ifdef MDE_CPU_IA32
-  if (!FeaturePcdGet (PcdDxeIplSwitchToLongMode)) {
-    return SIZE_64MB;
-  }
-
- #endif
-
-  //
   // Dependent on physical address width, PEI memory allocations can be
   // dominated by the page tables built for 64-bit DXE. So we key the cap off
   // of those. The code below is based on CreateIdentityMappingPageTables() in
@@ -291,7 +281,7 @@ PublishPeiMemory (
     DEBUG ((
       DEBUG_INFO,
       "%a: mPhysMemAddressWidth=%d PeiMemoryCap=%u KB\n",
-      __FUNCTION__,
+      __func__,
       mPhysMemAddressWidth,
       PeiMemoryCap >> 10
       ));

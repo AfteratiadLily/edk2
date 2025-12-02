@@ -154,10 +154,6 @@ SevEsUnexpectedRespTerminate:
 
 ; If SEV-ES is enabled then initialize and make the GHCB page shared
 SevClearPageEncMaskForGhcbPage:
-    ; Check if SEV is enabled
-    cmp       byte[WORK_AREA_GUEST_TYPE], 1
-    jnz       SevClearPageEncMaskForGhcbPageExit
-
     ; Check if SEV-ES is enabled
     mov       ecx, 1
     bt        [SEV_ES_WORK_AREA_STATUS_MSR], ecx
@@ -166,11 +162,14 @@ SevClearPageEncMaskForGhcbPage:
     ;
     ; The initial GHCB will live at GHCB_BASE and needs to be un-encrypted.
     ; This requires the 2MB page for this range be broken down into 512 4KB
-    ; pages.  All will be marked encrypted, except for the GHCB.
+    ; pages.  All will be marked encrypted, except for the GHCB. Since the
+    ; original PMD entry is no longer a leaf entry, remove the encryption
+    ; bit when pointing to the PTE page.
     ;
     mov     ecx, (GHCB_BASE >> 21)
     mov     eax, GHCB_PT_ADDR + PAGE_PDP_ATTR
     mov     [ecx * 8 + PT_ADDR (0x2000)], eax
+    mov     [ecx * 8 + PT_ADDR (0x2000) + 4], strict dword 0
 
     ;
     ; Page Table Entries (512 * 4KB entries => 2MB)
@@ -195,20 +194,12 @@ pageTableEntries4kLoop:
 SevClearPageEncMaskForGhcbPageExit:
     OneTimeCallRet SevClearPageEncMaskForGhcbPage
 
-; Check if SEV is enabled, and get the C-bit mask above 31.
+; Get the C-bit mask above 31.
 ; Modified: EDX
 ;
 ; The value is returned in the EDX
 GetSevCBitMaskAbove31:
-    xor       edx, edx
-
-    ; Check if SEV is enabled
-    cmp       byte[WORK_AREA_GUEST_TYPE], 1
-    jnz       GetSevCBitMaskAbove31Exit
-
     mov       edx, dword[SEV_ES_WORK_AREA_ENC_MASK + 4]
-
-GetSevCBitMaskAbove31Exit:
     OneTimeCallRet GetSevCBitMaskAbove31
 
 %endif
@@ -235,16 +226,6 @@ ClearSevEsWorkArea:
     inc    eax
     loop   ClearSevEsWorkArea
 
-    ;
-    ; Set up exception handlers to check for SEV-ES
-    ;   Load temporary RAM stack based on PCDs (see SevEsIdtVmmComm for
-    ;   stack usage)
-    ;   Establish exception handlers
-    ;
-    mov       esp, SEV_ES_VC_TOP_OF_STACK
-    mov       eax, ADDR_OF(Idtr)
-    lidt      [cs:eax]
-
     ; Check if we have a valid (0x8000_001F) CPUID leaf
     ;   CPUID raises a #VC exception if running as an SEV-ES guest
     mov       eax, 0x80000000
@@ -258,9 +239,19 @@ ClearSevEsWorkArea:
 
     ; Check for SEV memory encryption feature:
     ; CPUID  Fn8000_001F[EAX] - Bit 1
+    ; Check for the COHERENCY_SFW_NO feature:
+    ; CPUID  Fn8000_001F[EBX] - Bit 31
     ;   CPUID raises a #VC exception if running as an SEV-ES guest
     mov       eax, 0x8000001f
     cpuid
+
+    ; If COHERENCY_SFW_NO is set, set the CSFW_NO bit in the FLAGS field
+    ; of the workarea (this can be set regardless of whether SEV is enabled).
+    bt        ebx, 31
+    jnc       CheckSev
+    or        byte[SEV_ES_WORK_AREA_FLAGS], SEV_ES_WORK_AREA_FLAG_CSFW_NO
+
+CheckSev:
     bt        eax, 1
     jnc       NoSev
 
@@ -315,9 +306,9 @@ NoSev:
     ; Perform an SEV-ES sanity check by seeing if a #VC exception occurred.
     ;
     ; If SEV-ES is enabled, the CPUID instruction will trigger a #VC exception
-    ; where the RECEIVED_VC offset in the workarea will be set to one.
+    ; where the VC bit in the FLAGS field in the workarea will be set to one.
     ;
-    cmp       byte[SEV_ES_WORK_AREA_RECEIVED_VC], 0
+    test      byte[SEV_ES_WORK_AREA_FLAGS], SEV_ES_WORK_AREA_FLAG_VC
     jz        NoSevPass
 
     ;
@@ -333,15 +324,6 @@ NoSevPass:
     xor       eax, eax
 
 SevExit:
-    ;
-    ; Clear exception handlers and stack
-    ;
-    push      eax
-    mov       eax, ADDR_OF(IdtrClear)
-    lidt      [cs:eax]
-    pop       eax
-    mov       esp, 0
-
     OneTimeCallRet CheckSevFeatures
 
 ; Start of #VC exception handling routines
@@ -395,9 +377,9 @@ SnpCpuidEntryFound:
     mov     [esp + VC_CPUID_RESULT_EAX], eax
     mov     eax, [ecx + SNP_CPUID_ENTRY_EBX]
     mov     [esp + VC_CPUID_RESULT_EBX], eax
-    mov     eax, [ecx + SNP_CPUID_ENTRY_EDX]
-    mov     [esp + VC_CPUID_RESULT_ECX], eax
     mov     eax, [ecx + SNP_CPUID_ENTRY_ECX]
+    mov     [esp + VC_CPUID_RESULT_ECX], eax
+    mov     eax, [ecx + SNP_CPUID_ENTRY_EDX]
     mov     [esp + VC_CPUID_RESULT_EDX], eax
     jmp     VmmDoneSnpCpuid
 
@@ -411,9 +393,9 @@ SevEsIdtVmmComm:
     ; If we're here, then we are an SEV-ES guest and this
     ; was triggered by a CPUID instruction
     ;
-    ; Set the recievedVc field in the workarea to communicate that
-    ; a #VC was taken.
-    mov     byte[SEV_ES_WORK_AREA_RECEIVED_VC], 1
+    ; Set the VC bit in the FLAGS field in the workarea to communicate
+    ; that a #VC was taken.
+    or      byte[SEV_ES_WORK_AREA_FLAGS], SEV_ES_WORK_AREA_FLAG_VC
 
     pop     ecx                     ; Error code
     cmp     ecx, 0x72               ; Be sure it was CPUID
@@ -509,6 +491,34 @@ VmmDoneSnpCpuid:
     ; (the CPUID instruction has a length of 2)
     add     word [esp], CPUID_INSN_LEN
     iret
+
+%ifdef ARCH_X64
+
+SevCpuidInit:
+    ;
+    ; Set up exception handlers to check for SEV-ES
+    ;   Load temporary RAM stack based on PCDs (see SevEsIdtVmmComm for
+    ;   stack usage)
+    ;   Establish exception handlers
+    ;
+    mov       esp, SEV_ES_VC_TOP_OF_STACK
+    mov       eax, ADDR_OF(Idtr)
+    lidt      [cs:eax]
+
+    OneTimeCallRet SevCpuidInit
+
+SevCpuidExit:
+    ;
+    ; Clear exception handlers and stack
+    ;
+    mov       eax, ADDR_OF(IdtrClear)
+    lidt      [cs:eax]
+    xor       eax, eax
+    mov       esp, eax
+
+    OneTimeCallRet SevCpuidExit
+
+%endif
 
 ALIGN   2
 

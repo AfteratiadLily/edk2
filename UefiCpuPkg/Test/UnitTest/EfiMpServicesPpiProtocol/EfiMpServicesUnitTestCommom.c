@@ -45,7 +45,7 @@ InitUTContext (
 
   Status = MpServicesUnitTestWhoAmI (LocalContext->MpServices, &BspNumber);
   UT_ASSERT_NOT_EFI_ERROR (Status);
-  DEBUG ((DEBUG_INFO, "%a: BspNumber = 0x%x\n", __FUNCTION__, BspNumber));
+  DEBUG ((DEBUG_INFO, "%a: BspNumber = 0x%x\n", __func__, BspNumber));
 
   Status = MpServicesUnitTestGetNumberOfProcessors (
              LocalContext->MpServices,
@@ -56,7 +56,7 @@ InitUTContext (
   DEBUG ((
     DEBUG_INFO,
     "%a: NumberOfProcessors = 0x%x, NumberOfEnabledProcessors = 0x%x\n",
-    __FUNCTION__,
+    __func__,
     NumberOfProcessors,
     NumberOfEnabledProcessors
     ));
@@ -89,7 +89,7 @@ InitUTContext (
         LocalContext->DisabledApNumber[IndexOfDisabledAPs] = ProcessorNumber;
         IndexOfDisabledAPs++;
 
-        DEBUG ((DEBUG_INFO, "%a: AP(0x%x) is disabled and temporarily enable it.\n", __FUNCTION__, ProcessorNumber));
+        DEBUG ((DEBUG_INFO, "%a: AP(0x%x) is disabled and temporarily enable it.\n", __func__, ProcessorNumber));
         Status = MpServicesUnitTestEnableDisableAP (
                    LocalContext->MpServices,
                    ProcessorNumber,
@@ -134,7 +134,7 @@ CheckUTContext (
 
   if (BspNumber != LocalContext->BspNumber) {
     LocalContext->BspNumber = BspNumber;
-    DEBUG ((DEBUG_INFO, "%a: New BspNumber = 0x%x\n", __FUNCTION__, BspNumber));
+    DEBUG ((DEBUG_INFO, "%a: New BspNumber = 0x%x\n", __func__, BspNumber));
   }
 
   ASSERT (BspNumber == LocalContext->BspNumber);
@@ -148,11 +148,11 @@ CheckUTContext (
 
   if (NumberOfProcessors != LocalContext->NumberOfProcessors) {
     LocalContext->NumberOfProcessors = NumberOfProcessors;
-    DEBUG ((DEBUG_INFO, "%a: New NumberOfProcessors = 0x%x\n", __FUNCTION__, NumberOfProcessors));
+    DEBUG ((DEBUG_INFO, "%a: New NumberOfProcessors = 0x%x\n", __func__, NumberOfProcessors));
   }
 
   if (NumberOfEnabledProcessors != LocalContext->NumberOfProcessors) {
-    DEBUG ((DEBUG_INFO, "%a: New NumberOfEnabledProcessors = 0x%x\n", __FUNCTION__, NumberOfEnabledProcessors));
+    DEBUG ((DEBUG_INFO, "%a: New NumberOfEnabledProcessors = 0x%x\n", __func__, NumberOfEnabledProcessors));
 
     for (ProcessorNumber = 0; ProcessorNumber < LocalContext->NumberOfProcessors; ProcessorNumber++) {
       Status = MpServicesUnitTestGetProcessorInfo (
@@ -163,7 +163,7 @@ CheckUTContext (
       ASSERT_EFI_ERROR (Status);
 
       if (!(ProcessorInfoBuffer.StatusFlag & PROCESSOR_ENABLED_BIT)) {
-        DEBUG ((DEBUG_INFO, "%a: AP(0x%x) is disabled unexpectedly and reenable it.\n", __FUNCTION__, ProcessorNumber));
+        DEBUG ((DEBUG_INFO, "%a: AP(0x%x) is disabled unexpectedly and reenable it.\n", __func__, ProcessorNumber));
         Status = MpServicesUnitTestEnableDisableAP (
                    LocalContext->MpServices,
                    ProcessorNumber,
@@ -204,7 +204,7 @@ FreeUTContext (
       DEBUG ((
         DEBUG_INFO,
         "%a: Disable AP(0x%x) to restore its state.\n",
-        __FUNCTION__,
+        __func__,
         LocalContext->DisabledApNumber[IndexOfDisabledAPs]
         ));
 
@@ -231,6 +231,7 @@ FreeUTContext (
   @param[in,out] Buffer   The pointer to private data buffer.
 **/
 VOID
+EFIAPI
 StoreCpuNumbers (
   IN OUT VOID  *Buffer
   )
@@ -260,6 +261,7 @@ StoreCpuNumbers (
   @param[in,out] Buffer   The pointer to private data buffer.
 **/
 VOID
+EFIAPI
 StoreAPsExecutionOrder (
   IN OUT VOID  *Buffer
   )
@@ -290,6 +292,7 @@ StoreAPsExecutionOrder (
   @param[in,out] Buffer   The pointer to private data buffer.
 **/
 VOID
+EFIAPI
 InfiniteLoopProcedure (
   IN OUT VOID  *Buffer
   )
@@ -308,6 +311,7 @@ InfiniteLoopProcedure (
   @param[in,out] Buffer   The pointer to private data buffer.
 **/
 VOID
+EFIAPI
 EmptyProcedure (
   IN OUT VOID  *Buffer
   )
@@ -320,6 +324,7 @@ EmptyProcedure (
   @param[in,out] Buffer   The pointer to private data buffer.
 **/
 VOID
+EFIAPI
 RunMpServiceGetNumberOfProcessorsOnAp (
   IN OUT VOID  *Buffer
   )
@@ -343,6 +348,7 @@ RunMpServiceGetNumberOfProcessorsOnAp (
   @param[in,out] Buffer   The pointer to private data buffer.
 **/
 VOID
+EFIAPI
 RunMpServiceGetProcessorInfoOnAp (
   IN OUT VOID  *Buffer
   )
@@ -365,6 +371,7 @@ RunMpServiceGetProcessorInfoOnAp (
   @param[in,out] Buffer   The pointer to private data buffer.
 **/
 VOID
+EFIAPI
 RunMpServiceEnableDisableAPOnAp (
   IN OUT VOID  *Buffer
   )
@@ -387,6 +394,7 @@ RunMpServiceEnableDisableAPOnAp (
   @param[in,out] Buffer   The pointer to private data buffer.
 **/
 VOID
+EFIAPI
 RunMpServiceStartupThisAPOnAp (
   IN OUT VOID  *Buffer
   )
@@ -410,6 +418,7 @@ RunMpServiceStartupThisAPOnAp (
   @param[in,out] Buffer   The pointer to private data buffer.
 **/
 VOID
+EFIAPI
 RunMpServiceStartupAllAPsOnAp (
   IN OUT VOID  *Buffer
   )
@@ -433,6 +442,7 @@ RunMpServiceStartupAllAPsOnAp (
   @param[in,out] Buffer   The pointer to private data buffer.
 **/
 VOID
+EFIAPI
 RunMpServiceSwitchBSPOnAp (
   IN OUT VOID  *Buffer
   )

@@ -4,7 +4,7 @@
   Local APIC library assumes local APIC is enabled. It does not
   handles cases where local APIC is disabled.
 
-  Copyright (c) 2010 - 2019, Intel Corporation. All rights reserved.<BR>
+  Copyright (c) 2010 - 2023, Intel Corporation. All rights reserved.<BR>
   SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
@@ -186,6 +186,21 @@ SendInitIpiAllExcludingSelf (
   );
 
 /**
+  Send a Start-up IPI to all processors excluding self.
+  This function returns after the IPI has been accepted by the target processors.
+  if StartupRoutine >= 1M, then ASSERT.
+  if StartupRoutine is not multiple of 4K, then ASSERT.
+  @param  StartupRoutine  Points to a start-up routine which is below 1M physical
+                          address and 4K aligned.
+**/
+
+VOID
+EFIAPI
+SendStartupIpiAllExcludingSelf (
+  IN UINT32  StartupRoutine
+  );
+
+/**
   Send an INIT-Start-up-Start-up IPI sequence to a specified target processor.
 
   This function returns after the IPI has been accepted by the target processor.
@@ -290,7 +305,7 @@ GetApicTimerCurrentCount (
   @param DivideValue   The divide value for the DCR. It is one of 1,2,4,8,16,32,64,128.
                        If it is 0, then use the current divide value in the DCR.
   @param InitCount     The initial count value.
-  @param PeriodicMode  If TRUE, timer mode is peridoic. Othewise, timer mode is one-shot.
+  @param PeriodicMode  If TRUE, timer mode is periodic. Othewise, timer mode is one-shot.
   @param Vector        The timer interrupt vector number.
 **/
 VOID
@@ -306,7 +321,7 @@ InitializeApicTimer (
   Get the state of the local APIC timer.
 
   @param DivideValue   Return the divide value for the DCR. It is one of 1,2,4,8,16,32,64,128.
-  @param PeriodicMode  Return the timer mode. If TRUE, timer mode is peridoic. Othewise, timer mode is one-shot.
+  @param PeriodicMode  Return the timer mode. If TRUE, timer mode is periodic. Othewise, timer mode is one-shot.
   @param Vector        Return the timer interrupt vector number.
 **/
 VOID
